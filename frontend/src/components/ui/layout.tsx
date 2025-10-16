@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { label: "Home", key: "home" },
   { label: "Matches", key: "matches" },
   { label: "Chat", key: "chat" },
-  { label: "Events", key: "events" },
+  { label: "Profile", key: "profile" },
 ];
 
 const pastelShadow =

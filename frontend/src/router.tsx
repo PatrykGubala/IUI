@@ -1,15 +1,13 @@
-import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-
-import HomePage from "./pages/home/homePage";
+import { Routes, Route } from "react-router-dom";
+import HomePage from "./pages/homePage";
+import ChatPage from "./pages/chatPage";
 
 const Router: React.FC = () => {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="chat" element={<ChatPage />} />
+    </Routes>
   );
 };
 

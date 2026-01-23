@@ -8,11 +8,10 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-    const { isAuthenticated, token } = useAuth();
+    const { isAuthenticated, tokens } = useAuth();
     const location = useLocation();
 
-    // Gdy jeszcze nie wiemy, czy jest token (hydration)
-    if (token === null && !isAuthenticated) {
+    if (tokens === null && !isAuthenticated) {
         return (
             <Center height="100vh">
                 <Spinner size="xl" color="pink.500" />

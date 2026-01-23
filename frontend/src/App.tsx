@@ -1,15 +1,22 @@
-import Layout from "./components/ui/layout";
 import Router from "./router";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Provider } from "./components/ui/provider";
+import { AuthProvider } from "./contexts/AuthContext";
+import theme from "./components/ui/theme";
+import Layout from "./components/ui/layout";
+import {BrowserRouter} from "react-router-dom";  // Opcjonalnie – jeśli chcesz Layout wokół routera
 
-const App = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <BrowserRouter>
-      <Layout>
-        <Router />
-      </Layout>
-    </BrowserRouter>
-  );
+const App = () => {
+    return (
+        <Provider theme={theme}>
+            <AuthProvider>
+                <BrowserRouter>  {/* Tylko jeden BrowserRouter tutaj */}
+                    <Layout>
+                        <Router />
+                    </Layout>
+                </BrowserRouter>
+            </AuthProvider>
+        </Provider>
+    );
 };
 
 export default App;

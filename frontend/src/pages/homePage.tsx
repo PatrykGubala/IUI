@@ -12,9 +12,33 @@ import {
   Icon,
 } from "@chakra-ui/react";
 import { FaHeart, FaUsers, FaShieldAlt, FaComment } from "react-icons/fa";
+import {useAuth} from "../contexts/AuthContext.tsx";
+import {useNavigate} from "react-router-dom";
+
 import Layout from "../components/ui/layout";
 
 const HomePage: React.FC = () => {
+
+  const {isAuthenticated } = useAuth();
+  const navigation = useNavigate();
+  const handleGetStarted = () =>{
+    if(!isAuthenticated){
+      navigation('/register');
+    }
+    else{
+      navigation('/matches');
+    }
+  };
+
+  const handleCreateProfile = () => {
+    if(!isAuthenticated){
+      navigation('/register');
+    }
+    else {
+      navigation('/profile');
+    }
+  };
+
   return (
     <>
       <VStack gap={12} py={10}>
@@ -55,8 +79,9 @@ const HomePage: React.FC = () => {
                 boxShadow: "0 6px 28px 0px rgba(238, 63, 155, 0.25)",
               }}
               transition="all 0.2s"
+              onClick = {handleGetStarted}
             >
-              Get Started Free
+              {!isAuthenticated ? (<p>Get started free</p>) : (<p>Find your match</p>)}
             </Button>
             <Button
               size="lg"
@@ -291,8 +316,10 @@ const HomePage: React.FC = () => {
               boxShadow: "0 8px 24px rgba(255, 255, 255, 0.3)",
             }}
             transition="all 0.2s"
+            onClick = {handleCreateProfile}
           >
-            Create Your Profile Now
+            {!isAuthenticated ? (<p>Create your profile now</p>) : (<p>Go to your profile</p>)}
+
           </Button>
         </Box>
       </VStack>

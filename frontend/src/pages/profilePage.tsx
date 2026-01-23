@@ -137,7 +137,7 @@ const ProfilePage: React.FC = () => {
               <Editable.Root
                 value={profileData.firstName}
                 onValueChange={(e) =>
-                  setProfileData({ ...profileData, firstName: e.value })
+                  setProfileData({ ...profileData, username: e.value })
                 }
               >
                 <Editable.Preview

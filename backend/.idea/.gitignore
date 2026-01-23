@@ -1,4 +1,13 @@
-﻿# Created by https://www.toptal.com/developers/gitignore/api/pycharm,django,python
+﻿# Default ignored files
+/shelf/
+/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+
+# Created by https://www.toptal.com/developers/gitignore/api/pycharm,django,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=pycharm,django,python
 
 ### Django ###

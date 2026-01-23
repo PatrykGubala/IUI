@@ -1,0 +1,17 @@
+﻿version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: dating_postgres_db
+    environment:
+      POSTGRES_DB: dating_appdb
+      POSTGRES_USER: dating_appuser
+      POSTGRES_PASSWORD: dating_apppass
+    ports:
+      - "5432:5432"
+    volumes:
+      - dating_db_data:/var/lib/postgresql/data
+
+volumes:
+  dating_db_data:

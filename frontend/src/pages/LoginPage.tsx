@@ -33,22 +33,25 @@ const LoginPage: React.FC = () => {
             });
             const {access, refresh} = res.data;
 
+            if(res.status === 200) {
+                console.log(res.data);
+                login(access, refresh);
+                toaster.create({
+                    title: "Logged in",
+                    description: "Welcome back!",
+                    type: "success",
+                });
+                console.log(res.data);
+                navigate("/matches");
+            }
 
-            // zakładamy, że backend zwraca { token, user }
-            login(access, refresh);
-            toaster.create({
-                title: "Logged in",
-                description: "Welcome back!",
-                type: "success",
-            });
-            console.log(res.data);
-            navigate("/matches");
         } catch (err) {
             toaster.create({
                 title: "Login failed",
                 description: "Check your email and password.",
                 type: "error",
             });
+            console.error(err);
         }
     };
 

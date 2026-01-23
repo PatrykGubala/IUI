@@ -15,8 +15,6 @@ import { FaHeart, FaUsers, FaShieldAlt, FaComment } from "react-icons/fa";
 import {useAuth} from "../contexts/AuthContext.tsx";
 import {useNavigate} from "react-router-dom";
 
-import Layout from "../components/ui/layout";
-
 const HomePage: React.FC = () => {
 
   const {isAuthenticated } = useAuth();

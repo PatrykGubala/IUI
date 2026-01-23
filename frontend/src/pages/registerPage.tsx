@@ -12,7 +12,6 @@ import {
     HStack,
 } from "@chakra-ui/react";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
-import { useAuth } from "./../contexts/AuthContext";
 import { toaster } from "./../components/ui/toaster";
 import api from "../contexts/AxiosInstance";
 
@@ -22,7 +21,7 @@ const RegisterPage: React.FC = () => {
     const [password, setPassword] = useState("");
     const [password2, setPassword2] = useState("");
     const navigate = useNavigate();
-    const { login } = useAuth();
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -37,41 +36,25 @@ const RegisterPage: React.FC = () => {
         }
 
         try {
-            const res = await api.post("http://localhost:8080/api/auth/register", {
+            const res = await api.post("register/", {
                 username,
                 email,
                 password
             });
 
-            if (!res.ok) {
-                throw new Error("Registration failed");
-            }
-
-            const data = await res.json();
-            // Wariant 1: backend od razu zwraca token -> logujemy od razu
-            if (data.token && data.user) {
-                login(data.token, data.user);
-                toaster.create({
-                    title: "Registration successful",
-                    description: "Welcome to LoveConnect!",
-                    type: "success",
-                });
-                navigate("/matches");
-            } else {
-                // Wariant 2: brak tokena -> przejście na login
-                toaster.create({
-                    title: "Registration successful",
-                    description: "You can now log in.",
-                    type: "success",
-                });
-                navigate("/login");
-            }
+            toaster.create({
+                title: `Registration successful ${res.data.username}`,
+                description: "You can now log in.",
+                type: "success",
+            });
+            navigate("/login");
         } catch (err) {
             toaster.create({
                 title: "Registration failed",
                 description: "Try again or use a different email.",
                 type: "error",
             });
+            console.error(err);
         }
     };
 

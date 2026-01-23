@@ -3,7 +3,6 @@ import {
   Box,
   VStack,
   HStack,
-  Avatar,
   Button,
   Text,
   Input,
@@ -137,7 +136,7 @@ const ProfilePage: React.FC = () => {
               <Editable.Root
                 value={profileData.firstName}
                 onValueChange={(e) =>
-                  setProfileData({ ...profileData, username: e.value })
+                  setProfileData({ ...profileData, firstName: e.value })
                 }
               >
                 <Editable.Preview

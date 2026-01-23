@@ -5,9 +5,12 @@ const api = axios.create({
     headers: { "Content-Type": "application/json" },
 });
 
-// Dołącz token z localStorage (simple, wystarczające dla SPA)
+const TOKEN_KEY = "access";
+const REFRESH_KEY = "refresh";
+
+
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem("jwt_token");
+    const token = localStorage.getItem(TOKEN_KEY);
     if (token) {
         config.headers = config.headers ?? {};
         config.headers.Authorization = `Bearer ${token}`;
@@ -19,9 +22,9 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            localStorage.removeItem("jwt_token");
+            localStorage.removeItem(TOKEN_KEY);
             localStorage.removeItem("user");
-            window.location.href = "/";
+            // window.location.href = "/";
         }
         return Promise.reject(error);
     }

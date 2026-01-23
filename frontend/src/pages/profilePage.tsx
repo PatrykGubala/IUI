@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, {useEffect, useState} from "react";
 import {
   Box,
   VStack,
@@ -14,6 +14,7 @@ import {
   Field,
 } from "@chakra-ui/react";
 import { toaster } from "../components/ui/toaster";
+import api from "./../contexts/AxiosInstance.ts";
 
 const ProfilePage: React.FC = () => {
   const [profileData, setProfileData] = useState({
@@ -24,6 +25,7 @@ const ProfilePage: React.FC = () => {
     description:
       "Computer science student passionate about exploring new technologies.",
     profilePhoto: "https://randomuser.me/api/portraits/women/65.jpg",
+    userTags: []
   });
 
   const [tags, setTags] = useState([
@@ -79,6 +81,23 @@ const ProfilePage: React.FC = () => {
     });
   };
 
+  const fetchData = async () =>{
+    try{
+      const userResponse = await api.get('/profile');
+      setProfileData(userResponse.data);
+
+      const tagsResponse = await api.get('/tags');
+      setTags(tagsResponse.data);
+    }
+    catch(err) {
+      console.log(err);
+    }
+  }
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   return (
     <>
       <VStack gap={8} align="stretch">
@@ -112,16 +131,17 @@ const ProfilePage: React.FC = () => {
             display="none"
             id="photo-upload"
           />
-          <Button
-            as="label"
-            htmlFor="photo-upload"
-            colorScheme="pink"
-            size="sm"
-            borderRadius="full"
-            cursor="pointer"
-          >
-            Change Photo
-          </Button>
+          <label htmlFor="photo-upload">
+            <Button
+                as="span"
+                colorScheme="pink"
+                size="sm"
+                borderRadius="full"
+                cursor="pointer"
+            >
+              Change Photo
+            </Button>
+          </label>
         </VStack>
 
         <Box>

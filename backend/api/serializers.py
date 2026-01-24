@@ -10,21 +10,49 @@ class UserSerializer(serializers.ModelSerializer):
     lastName = serializers.CharField(source='last_name', required=False)
     description = serializers.CharField(source='bio', allow_blank=True, required=False)
     profilePhoto = serializers.ImageField(source='profile_picture', required=False)
+    latitude = serializers.FloatField(required=False, allow_null=True)
+    longitude = serializers.FloatField(required=False, allow_null=True)
+    city = serializers.CharField(required=False, allow_blank=True)
+    country = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = CustomUser
-        fields = ('id', 'username', 'email', 'firstName', 'lastName', 'role', 'profilePhoto', 'description', 'age', 'location', 'tags', 'occupation', 'university')
+        fields = (
+            'id', 'username', 'email',
+            'firstName', 'lastName',
+            'role', 'profilePhoto', 'description',
+            'age',
+            'location',
+            'latitude', 'longitude', 'city', 'country',
+            'tags', 'occupation', 'university',
+        )
         read_only_fields = ('role', 'username', 'email')
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
+    first_name = serializers.CharField(required=True, allow_blank=False)
+    last_name = serializers.CharField(required=True, allow_blank=False)
+    age = serializers.IntegerField(required=True)
+    latitude = serializers.FloatField(required=True)
+    longitude = serializers.FloatField(required=True)
+
     class Meta:
         model = CustomUser
-        fields = ('username', 'email', 'password', 'first_name', 'last_name')
+        fields = (
+            "username", "email", "password",
+            "first_name", "last_name",
+            "age",
+            "latitude", "longitude",
+        )
+
+    def validate_age(self, value):
+        if value < 18:
+            raise serializers.ValidationError("Must be 18+")
+        return value
 
     def create(self, validated_data):
-        password = validated_data.pop('password')
+        password = validated_data.pop("password")
         user = CustomUser(**validated_data)
         user.set_password(password)
         user.save()

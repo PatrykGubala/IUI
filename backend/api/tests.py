@@ -158,3 +158,31 @@ class FeedDebugTests(APITestCase):
         # u3 ma python+fitness (czyli dokładnie Twoje) + netflix, powinien być najwyżej
         self.assertTrue(returned_ids.index(self.u3.id) < returned_ids.index(self.u1.id))
         self.assertTrue(returned_ids.index(self.u1.id) < returned_ids.index(self.u2.id))
+
+    def test_feed_filters_by_distance_20km(self):
+        # Ustaw "me" na Kielce (centrum)
+        self.me.latitude = 50.883333
+        self.me.longitude = 20.616667
+        self.me.save()
+
+        self.u1.latitude = 50.87033
+        self.u1.longitude = 20.62752
+        self.u1.save()
+
+        self.u2.latitude = 52.2297
+        self.u2.longitude = 21.0122
+        self.u2.save()
+
+        self.u3.latitude = 50.90
+        self.u3.longitude = 20.60
+        self.u3.save()
+
+        url = reverse("potential_matches")
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        returned_ids = [item["user"]["id"] for item in res.data]
+
+        self.assertIn(self.u1.id, returned_ids)
+        self.assertIn(self.u3.id, returned_ids)
+        self.assertNotIn(self.u2.id, returned_ids)

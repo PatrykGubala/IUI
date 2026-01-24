@@ -12,7 +12,7 @@ from .serializers import (
     MatchListSerializer,
     MessageSerializer
 )
-
+from .utils import cosine, build_tag_vector
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = UserRegistrationSerializer
@@ -32,15 +32,57 @@ class PotentialMatchesView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        user = self.request.user
-        swiped_ids = Swipe.objects.filter(actor=user).values_list('target_id', flat=True)
-        return CustomUser.objects.exclude(
-            id__in=swiped_ids
-        ).exclude(
-            id=user.id
-        ).exclude(
-            role='admin'
-        ).order_by('?')
+        me = self.request.user
+        swiped_ids = Swipe.objects.filter(actor=me).values_list("target_id", flat=True)
+
+        return (
+            CustomUser.objects
+            .exclude(id__in=swiped_ids)
+            .exclude(id=me.id)
+            .exclude(role="admin")
+        )
+
+    def list(self, request, *args, **kwargs):
+        me = request.user
+
+        candidates_qs = self.get_queryset()
+        candidates = list(candidates_qs[:5000])
+
+        # --- vocab ---
+        all_tags = []
+        all_tags.extend(me.tags or [])
+        for c in candidates:
+            all_tags.extend(c.tags or [])
+        vocab = sorted(set(all_tags))
+
+        # --- wektor "ja" ---
+        me_vector = build_tag_vector(me.tags, vocab)
+
+        scored_candidates = []
+
+
+
+        for c in candidates:
+            my_tags = set(me.tags or [])
+            cand_tags = set(c.tags or [])
+
+            common_tags_count = len(my_tags & cand_tags)
+
+            c_vector = build_tag_vector(c.tags, vocab)
+            cosine_score = cosine(me_vector, c_vector)
+
+            final_score = 0.4 * common_tags_count + 0.6 * cosine_score
+
+            scored_candidates.append({
+                "score": round(final_score, 4),
+                "common": common_tags_count,
+                "cosine": round(cosine_score, 4),
+                "user": self.get_serializer(c).data,
+            })
+
+        scored_candidates.sort(key=lambda item: item["score"], reverse=True)
+
+        return Response(scored_candidates[:50])
 
 class SwipeView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]

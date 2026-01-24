@@ -12,8 +12,10 @@ class UserSerializer(serializers.ModelSerializer):
     profilePhoto = serializers.ImageField(source='profile_picture', required=False)
     latitude = serializers.FloatField(required=False, allow_null=True)
     longitude = serializers.FloatField(required=False, allow_null=True)
-    city = serializers.CharField(required=False, allow_blank=True)
-    country = serializers.CharField(required=False, allow_blank=True)
+    city = serializers.CharField(required=False, allow_blank=True, read_only=True)
+    country = serializers.CharField(required=False, allow_blank=True, read_only=True)
+
+    location = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
@@ -27,6 +29,10 @@ class UserSerializer(serializers.ModelSerializer):
             'tags', 'occupation', 'university',
         )
         read_only_fields = ('role', 'username', 'email')
+
+    def get_location(self, obj):
+        parts = [p for p in [obj.city, obj.country] if p]
+        return ", ".join(parts)
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)

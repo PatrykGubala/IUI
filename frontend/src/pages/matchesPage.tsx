@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, {useEffect, useState} from "react";
 import {
   Box,
   VStack,
@@ -6,9 +6,10 @@ import {
   Tag,
   HStack,
   IconButton,
-  Flex,
+  Flex, Center, Spinner,
 } from "@chakra-ui/react";
 import { FaHeart, FaTimes, FaChevronRight } from "react-icons/fa";
+import api from "./../contexts/AxiosInstance.ts";
 
 const dummyData = [
   {
@@ -46,7 +47,8 @@ const dummyData = [
   },
 ];
 
-interface TinderCardProps {
+
+type MatchCard = {
   image: string;
   name: string;
   age: number;
@@ -55,6 +57,10 @@ interface TinderCardProps {
   university: string;
   description: string;
   tags: string[];
+}
+
+interface TinderCardProps extends MatchCard{
+
   onPass: () => void;
   onDecline: () => void;
   onAccept: () => void;
@@ -158,10 +164,39 @@ const TinderCard: React.FC<TinderCardProps> = ({
 
 const HomePage: React.FC = () => {
   const [index, setIndex] = useState(0);
+  const [matches, setMatches] = useState<MatchCard[]>([]);
+  const [loading, setLoading] = useState(true);
+
 
   const handleNext = () => {
     setIndex((prevIndex) => (prevIndex + 1) % dummyData.length);
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const matchResponse = await api.get('matches/');
+        setMatches(matchResponse.data);
+        setIndex(0);
+      } catch (err) {
+        console.error(err);
+
+      } finally {
+        setLoading(false)
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+        <Center minH="60vh">
+          <Spinner size="xl" color="pink.500" />
+        </Center>
+    );
+  }
 
   return (
     <VStack>

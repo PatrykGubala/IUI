@@ -68,7 +68,7 @@ const RegisterPage: React.FC = () => {
                 maxW="md"
                 w="full"
             >
-                <VStack spacing={6} align="stretch">
+                <VStack align="stretch">
                     <Box textAlign="center">
                         <Heading size="lg" color="pink.600">
                             Create your account
@@ -79,7 +79,7 @@ const RegisterPage: React.FC = () => {
                     </Box>
 
                     <form onSubmit={handleSubmit}>
-                        <VStack spacing={4} align="stretch">
+                        <VStack align="stretch">
                             <Input
                                 placeholder="Name"
                                 value={username}
@@ -121,7 +121,7 @@ const RegisterPage: React.FC = () => {
                         <Button
                             as={RouterLink}
                             to="/login"
-                            variant="link"
+                            variant="ghost"
                             colorScheme="pink"
                             size="sm"
                         >

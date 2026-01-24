@@ -65,7 +65,7 @@ const LoginPage: React.FC = () => {
                 maxW="md"
                 w="full"
             >
-                <VStack spacing={6} align="stretch">
+                <VStack align="stretch">
                     <Box textAlign="center">
                         <Heading size="lg" color="pink.600">
                             Log in to LoveConnect
@@ -76,7 +76,7 @@ const LoginPage: React.FC = () => {
                     </Box>
 
                     <form onSubmit={handleSubmit}>
-                        <VStack spacing={4} align="stretch">
+                        <VStack align="stretch">
                             <Input
                                 type="text"
                                 placeholder="Username"
@@ -109,7 +109,7 @@ const LoginPage: React.FC = () => {
                     <Button
                         as={RouterLink}
                         to="/register"
-                        variant="link"
+                        variant="ghost"
                         colorScheme="pink"
                         size="sm"
                     >

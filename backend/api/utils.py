@@ -1,5 +1,5 @@
-﻿import math, requests
-from math import radians, cos, sin, asin, sqrt
+﻿from math import radians, cos, sin, asin, sqrt
+import requests
 
 def reverse_geocode_city(lat: float, lon: float):
     url = "https://nominatim.openstreetmap.org/reverse"
@@ -17,8 +17,8 @@ def reverse_geocode_city(lat: float, lon: float):
 
 def cosine(a, b):
     dot = sum(x*y for x, y in zip(a, b))
-    na = math.sqrt(sum(x*x for x in a))
-    nb = math.sqrt(sum(y*y for y in b))
+    na = sqrt(sum(x*x for x in a))
+    nb = sqrt(sum(y*y for y in b))
     if na == 0 or nb == 0:
         return 0.0
     return dot / (na * nb)
@@ -27,11 +27,12 @@ def build_tag_vector(tags, vocab):
     s = set(tags or [])
     return [1 if t in s else 0 for t in vocab]
 
+
 def distance_km(lat1, lon1, lat2, lon2):
-    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
     dlon = lon2 - lon1
     dlat = lat2 - lat1
-
-    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    a = min(1.0, max(0.0, a))  # clamp
     c = 2 * asin(sqrt(a))
     return 6371 * c

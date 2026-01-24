@@ -3,7 +3,6 @@ import {
   Box,
   VStack,
   HStack,
-  Avatar,
   Button,
   Text,
   Input,

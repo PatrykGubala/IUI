@@ -47,7 +47,7 @@ const Navbar = () => {
       >
         <Flex align="center" gap={4}>
           <Text fontWeight="bold" fontSize="xl" color="pink.600">
-            Heartline
+            LoveConnect
           </Text>
           {/*<Text fontSize="sm" color="black" fontWeight="500" opacity={0.7}>*/}
           {/*  Where every match feels like destiny*/}
@@ -166,7 +166,7 @@ const Footer = () => (
         boxShadow={pastelShadow}
         border={pastelBorder}
     >
-      © 2025 Heartline. Carefully crafted connections for modern romantics.
+      © 2025 LoveConnect. Carefully crafted connections for modern romantics.
     </Box>
 );
 

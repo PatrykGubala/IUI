@@ -176,7 +176,7 @@ const HomePage: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const matchResponse = await api.get('matches/');
+        const matchResponse = await api.get('dating/matches/');
         setMatches(matchResponse.data);
         setIndex(0);
       } catch (err) {

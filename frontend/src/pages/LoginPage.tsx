@@ -27,7 +27,7 @@ const LoginPage: React.FC = () => {
         e.preventDefault();
 
         try {
-            const res = await api.post("token/", {
+            const res = await api.post("auth/login/", {
                 username,
                 password,
             });

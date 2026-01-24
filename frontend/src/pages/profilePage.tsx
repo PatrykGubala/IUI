@@ -25,7 +25,7 @@ const ProfilePage: React.FC = () => {
     description:
       "Computer science student passionate about exploring new technologies.",
     profilePhoto: "https://randomuser.me/api/portraits/women/65.jpg",
-    userTags: []
+    tags: []
   });
 
   const [tags, setTags] = useState([
@@ -83,7 +83,7 @@ const ProfilePage: React.FC = () => {
 
   const fetchData = async () =>{
     try{
-      const userResponse = await api.get('/profile');
+      const userResponse = await api.get('user/profile/');
       setProfileData(userResponse.data);
 
       const tagsResponse = await api.get('/tags');
@@ -310,7 +310,7 @@ const ProfilePage: React.FC = () => {
             Interests & Hobbies
           </Text>
           <Wrap gap={3} mb={4}>
-            {tags.map((tag, index) => (
+            {profileData.tags.map((tag, index) => (
               <WrapItem key={index}>
                 <Tag.Root
                   size="lg"

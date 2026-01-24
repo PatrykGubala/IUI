@@ -9,46 +9,65 @@ import {
   Flex, Center, Spinner,
 } from "@chakra-ui/react";
 import { FaHeart, FaTimes, FaChevronRight } from "react-icons/fa";
+import { toaster } from "./../components/ui/toaster";
 import api from "./../contexts/AxiosInstance.ts";
 
-const dummyData = [
-  {
-    image: "https://randomuser.me/api/portraits/women/79.jpg",
-    name: "Emma",
-    age: 26,
-    location: "Los Angeles, CA",
-    occupation: "Marketing Manager",
-    university: "UCLA",
-    description:
-      "Beach lover 🏄‍♀️ | Fitness enthusiast | Dog mom to a golden retriever | Looking for my adventure partner",
-    tags: ["Fitness", "Dogs", "Beach", "Marketing"],
-  },
-  {
-    image: "https://randomuser.me/api/portraits/men/32.jpg",
-    name: "James",
-    age: 29,
-    location: "New York, NY",
-    occupation: "Software Engineer",
-    university: "NYU",
-    description:
-      "Tech geek 🤓 | Coffee lover | Gamer | Looking for someone to share adventures and code with",
-    tags: ["Tech", "Gaming", "Coffee", "Coding"],
-  },
-  {
-    image: "https://randomuser.me/api/portraits/women/65.jpg",
-    name: "Sophia",
-    age: 24,
-    location: "Chicago, IL",
-    occupation: "Graphic Designer",
-    university: "SAIC",
-    description:
-      "Art lover 🎨 | Wine enthusiast | Avid reader | Seeking creativity and fun",
-    tags: ["Art", "Wine", "Books", "Design"],
-  },
-];
+// const dummyData = [
+//   {
+//     image: "https://randomuser.me/api/portraits/women/79.jpg",
+//     name: "Emma",
+//     age: 26,
+//     location: "Los Angeles, CA",
+//     occupation: "Marketing Manager",
+//     university: "UCLA",
+//     description:
+//       "Beach lover 🏄‍♀️ | Fitness enthusiast | Dog mom to a golden retriever | Looking for my adventure partner",
+//     tags: ["Fitness", "Dogs", "Beach", "Marketing"],
+//   },
+//   {
+//     image: "https://randomuser.me/api/portraits/men/32.jpg",
+//     name: "James",
+//     age: 29,
+//     location: "New York, NY",
+//     occupation: "Software Engineer",
+//     university: "NYU",
+//     description:
+//       "Tech geek 🤓 | Coffee lover | Gamer | Looking for someone to share adventures and code with",
+//     tags: ["Tech", "Gaming", "Coffee", "Coding"],
+//   },
+//   {
+//     image: "https://randomuser.me/api/portraits/women/65.jpg",
+//     name: "Sophia",
+//     age: 24,
+//     location: "Chicago, IL",
+//     occupation: "Graphic Designer",
+//     university: "SAIC",
+//     description:
+//       "Art lover 🎨 | Wine enthusiast | Avid reader | Seeking creativity and fun",
+//     tags: ["Art", "Wine", "Books", "Design"],
+//   },
+// ];
 
+
+type FeedItem = {
+  common: number,
+  cosine: number,
+  score: number,
+  user: {
+    id: number,
+    image: string;
+    name: string;
+    age: number;
+    location: string;
+    occupation: string;
+    university: string;
+    description: string;
+    tags: string[];
+  }
+}
 
 type MatchCard = {
+  id: number,
   image: string;
   name: string;
   age: number;
@@ -132,10 +151,10 @@ const TinderCard: React.FC<TinderCardProps> = ({
     </Box>
     <HStack mt={5}>
       <IconButton
-        aria-label="Pass"
+        aria-label="Decline"
         size="lg"
         colorScheme="gray"
-        onClick={onPass}
+        onClick={onDecline}
         borderRadius="full"
       >
         <FaTimes />
@@ -150,10 +169,10 @@ const TinderCard: React.FC<TinderCardProps> = ({
         <FaHeart />
       </IconButton>
       <IconButton
-        aria-label="Decline"
+        aria-label="Pass"
         size="lg"
         colorScheme="purple"
-        onClick={onDecline}
+        onClick={onPass}
         borderRadius="full"
       >
         <FaChevronRight />
@@ -165,19 +184,71 @@ const TinderCard: React.FC<TinderCardProps> = ({
 const HomePage: React.FC = () => {
   const [index, setIndex] = useState(0);
   const [matches, setMatches] = useState<MatchCard[]>([]);
+
   const [loading, setLoading] = useState(true);
 
 
   const handleNext = () => {
-    setIndex((prevIndex) => (prevIndex + 1) % dummyData.length);
+    setIndex((prevIndex) => (prevIndex + 1) % matches.length);
   };
+
+  const sendSwipe = async (targetId: number, action: "LIKE" | "PASS") => {
+    try {
+      const res = await api.post("dating/swipe/", {
+        target_id: targetId,
+        action
+      });
+
+      if(res.data.is_match) {
+        toaster.create({
+          title: "It's a match! 🎉",
+          description: "You and this user like each other.",
+          type: "success",
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      toaster.create({
+        title: "Swipe failed",
+        description: "Try again later.",
+        type: "error",
+      });
+    }
+  };
+
+  const handleSwipe = async (action: "LIKE" | "PASS") => {
+    const current = matches[index];
+    if(!current) return;
+
+    await sendSwipe(current.id, action);
+
+    handleNext();
+  }
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const matchResponse = await api.get('dating/matches/');
-        setMatches(matchResponse.data);
+        const matchResponse = await api.get<FeedItem[]>('dating/feed/');
+
+        const normalized: MatchCard[] = matchResponse.data.map((item) => {
+          const u = item.user ?? {};
+
+          return {
+            id: u.id,
+            image: u.image ?? "https://upload.wikimedia.org/wikipedia/commons/a/a2/Person_Image_Placeholder.png",
+            name: u.name ?? "unknown",
+            age: u.age ?? 0,
+            location: u.location ?? "",
+            occupation: u.occupation ?? "",
+            university: u.university ?? "",
+            description: u.description ?? "",
+            tags: Array.isArray(u.tags) ? u.tags : [],
+          };
+        });
+
+        setMatches(normalized);
+        console.log(matchResponse.data)
         setIndex(0);
       } catch (err) {
         console.error(err);
@@ -198,6 +269,16 @@ const HomePage: React.FC = () => {
     );
   }
 
+  if (!matches.length) {
+    return (
+        <Center minH="60vh">
+          <Text fontSize="lg" color="gray.600">
+            Na razie brak dopasowań. Spróbuj później. 💔
+          </Text>
+        </Center>
+    );
+  }
+
   return (
     <VStack>
       <Text fontSize="3xl" fontWeight="bold" color="pink.700" mt={8}>
@@ -207,9 +288,9 @@ const HomePage: React.FC = () => {
         Find your perfect match
       </Text>
       <TinderCard
-        {...dummyData[index]}
-        onAccept={handleNext}
-        onDecline={handleNext}
+        {...matches[index]}
+        onAccept={() => handleSwipe("LIKE")}
+        onDecline={() => handleSwipe("PASS")}
         onPass={handleNext}
       />
     </VStack>

@@ -56,7 +56,8 @@ type FeedItem = {
   user: {
     id: number,
     image: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     age: number;
     location: string;
     occupation: string;
@@ -69,7 +70,8 @@ type FeedItem = {
 type MatchCard = {
   id: number,
   image: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   age: number;
   location: string;
   occupation: string;
@@ -87,7 +89,8 @@ interface TinderCardProps extends MatchCard{
 
 const TinderCard: React.FC<TinderCardProps> = ({
   image,
-  name,
+  firstName,
+  lastName,
   age,
   location,
   occupation,
@@ -128,7 +131,7 @@ const TinderCard: React.FC<TinderCardProps> = ({
         borderBottomRadius="2xl"
       >
         <Text fontWeight="bold" fontSize="2xl">
-          {name}, {age}
+          {firstName} {lastName}, {age}
         </Text>
         <HStack mt={1}>
           <Text fontSize="sm" fontWeight="medium">
@@ -237,7 +240,8 @@ const HomePage: React.FC = () => {
           return {
             id: u.id,
             image: u.image ?? "https://upload.wikimedia.org/wikipedia/commons/a/a2/Person_Image_Placeholder.png",
-            name: u.name ?? "unknown",
+            firstName: u.firstName ?? "unknown",
+            lastName: u.lastName ?? "unknown",
             age: u.age ?? 0,
             location: u.location ?? "",
             occupation: u.occupation ?? "",

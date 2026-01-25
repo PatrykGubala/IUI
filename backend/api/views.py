@@ -1,6 +1,7 @@
 from rest_framework import generics, permissions, status, views
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework_simplejwt.views import TokenObtainPairView
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from .models import CustomUser, Match, Swipe, Message
@@ -10,10 +11,13 @@ from .serializers import (
     DatingProfileSerializer,
     SwipeActionSerializer,
     MatchListSerializer,
-    MessageSerializer
+    MessageSerializer,
+    CustomTokenObtainPairSerializer
 )
 from .utils import cosine, build_tag_vector, reverse_geocode_city, distance_km
 
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
@@ -55,12 +59,14 @@ class PotentialMatchesView(generics.ListAPIView):
         me = self.request.user
         swiped_ids = Swipe.objects.filter(actor=me).values_list("target_id", flat=True)
 
-        return (
-            CustomUser.objects
-            .exclude(id__in=swiped_ids)
-            .exclude(id=me.id)
-            .exclude(role="admin")
-        )
+        qs = CustomUser.objects.exclude(id__in=swiped_ids).exclude(id=me.id).exclude(role="admin")
+
+        if me.interested_in:
+            qs = qs.filter(gender__in=me.interested_in)
+
+        qs = qs.filter(interested_in__contains=[me.gender])
+
+        return qs
 
     def list(self, request, *args, **kwargs):
         me = request.user
@@ -68,18 +74,16 @@ class PotentialMatchesView(generics.ListAPIView):
 
         candidates = list(self.get_queryset()[:5000])
 
-        # --- filtr odległości ---
         if me.latitude is not None and me.longitude is not None:
             filtered = []
             for c in candidates:
                 if c.latitude is None or c.longitude is None:
-                    continue  # nie znamy pozycji -> nie pokazujemy
+                    continue
                 d = distance_km(me.latitude, me.longitude, c.latitude, c.longitude)
                 if d <= max_km:
                     filtered.append(c)
             candidates = filtered
 
-        # --- vocab ---
         all_tags = []
         all_tags.extend(me.tags or [])
         for c in candidates:

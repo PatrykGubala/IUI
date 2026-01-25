@@ -2,8 +2,29 @@
 from .models import CustomUser, Match, Swipe, Message
 from django.contrib.auth import get_user_model
 from django.utils.timesince import timesince
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.db.models import Q
+from rest_framework.validators import UniqueValidator
 
 User = get_user_model()
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        username_or_email = attrs.get(self.username_field)
+        password = attrs.get('password')
+
+        if username_or_email and password:
+            user = User.objects.filter(
+                Q(username__iexact=username_or_email) |
+                Q(email__iexact=username_or_email)
+            ).first()
+
+            if user:
+                attrs[self.username_field] = user.get_username()
+        try:
+            return super().validate(attrs)
+        except Exception as e:
+            raise serializers.ValidationError("Invalid credentials")
 
 class UserSerializer(serializers.ModelSerializer):
     firstName = serializers.CharField(source='first_name', required=False)
@@ -14,6 +35,7 @@ class UserSerializer(serializers.ModelSerializer):
     longitude = serializers.FloatField(required=False, allow_null=True)
     city = serializers.CharField(required=False, allow_blank=True, read_only=True)
     country = serializers.CharField(required=False, allow_blank=True, read_only=True)
+    interestedIn = serializers.ListField(source='interested_in', child=serializers.CharField(), required=False)
 
     location = serializers.SerializerMethodField()
 
@@ -23,7 +45,7 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email',
             'firstName', 'lastName',
             'role', 'profilePhoto', 'description',
-            'age',
+            'age', 'gender', 'interestedIn',
             'location',
             'latitude', 'longitude', 'city', 'country',
             'tags', 'occupation', 'university',
@@ -35,20 +57,30 @@ class UserSerializer(serializers.ModelSerializer):
         return ", ".join(parts)
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(
+        required=True,
+        validators=[UniqueValidator(queryset=CustomUser.objects.all(), message="This email is already in use.")]
+    )
+    username = serializers.CharField(
+        required=True,
+        validators=[UniqueValidator(queryset=CustomUser.objects.all(), message="This username is already taken.")]
+    )
     password = serializers.CharField(write_only=True)
-
     first_name = serializers.CharField(required=True, allow_blank=False)
     last_name = serializers.CharField(required=True, allow_blank=False)
     age = serializers.IntegerField(required=True)
+    gender = serializers.CharField(required=True)
+    interested_in = serializers.ListField(child=serializers.CharField(), required=True)
     latitude = serializers.FloatField(required=True)
     longitude = serializers.FloatField(required=True)
+    tags = serializers.ListField(child=serializers.CharField(), required=False)
 
     class Meta:
         model = CustomUser
         fields = (
             "username", "email", "password",
             "first_name", "last_name",
-            "age",
+            "age", "gender", "interested_in", "tags",
             "latitude", "longitude",
         )
 
@@ -59,8 +91,13 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password")
+        tags = validated_data.pop("tags", [])
+        interested_in = validated_data.pop("interested_in", [])
+
         user = CustomUser(**validated_data)
         user.set_password(password)
+        user.tags = tags
+        user.interested_in = interested_in
         user.save()
         return user
 
@@ -68,6 +105,7 @@ class DatingProfileSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(source='profile_picture', read_only=True)
     firstName = serializers.CharField(source='first_name', read_only=True)
     lastName  = serializers.CharField(source='last_name', read_only=True)
+    name = serializers.SerializerMethodField()
     description = serializers.CharField(source='bio', read_only=True)
     location = serializers.SerializerMethodField()
 
@@ -76,18 +114,19 @@ class DatingProfileSerializer(serializers.ModelSerializer):
         fields = (
             'id',
             'image',
-            'firstName', 'lastName',
-            'age',
+            'firstName', 'lastName', 'name',
+            'age', 'gender',
             'location',
             'occupation', 'university',
             'description',
             'tags',
         )
+    def get_name(self, obj):
+        return obj.first_name if obj.first_name else obj.username
 
     def get_location(self, obj):
         parts = [p for p in [obj.city, obj.country] if p]
         return ", ".join(parts)
-
 
 class SwipeActionSerializer(serializers.Serializer):
     target_id = serializers.IntegerField()

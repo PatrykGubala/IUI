@@ -7,8 +7,16 @@ class CustomUser(AbstractUser):
         ('user', 'User'),
         ('admin', 'Administrator'),
     )
+    GENDER_CHOICES = (
+        ('M', 'Male'),
+        ('F', 'Female'),
+        ('O', 'Other'),
+    )
+
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, default='O')
+    interested_in = models.JSONField(default=list, blank=True)
     profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
     bio = models.TextField(max_length=500, blank=True)
     age = models.IntegerField(null=True, blank=True)

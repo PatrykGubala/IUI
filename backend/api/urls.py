@@ -1,5 +1,5 @@
 ﻿from django.urls import path
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView
 from django.conf import settings
 from django.conf.urls.static import static
 from .views import (
@@ -9,7 +9,8 @@ from .views import (
     SwipeView,
     MyMatchesView,
     MessageListView,
-    CustomTokenObtainPairView
+    CustomTokenObtainPairView,
+    GlobalChatStreamView
 )
 
 urlpatterns = [
@@ -24,6 +25,7 @@ urlpatterns = [
     path('dating/matches/', MyMatchesView.as_view(), name='my_matches'),
 
     path('chat/<int:match_id>/messages/', MessageListView.as_view(), name='match_messages'),
+    path('chat/stream/', GlobalChatStreamView.as_view(), name='global_chat_stream'),
 ]
 
 if settings.DEBUG:

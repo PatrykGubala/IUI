@@ -4,6 +4,9 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
+from django.http import StreamingHttpResponse
+import json
+import time
 from .models import CustomUser, Match, Swipe, Message
 from .serializers import (
     UserRegistrationSerializer,
@@ -172,3 +175,30 @@ class MessageListView(generics.ListCreateAPIView):
         if self.request.user not in match.users.all():
             raise permissions.PermissionDenied()
         serializer.save(sender=self.request.user, match=match)
+
+class GlobalChatStreamView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        def event_stream():
+            last_msg = Message.objects.order_by('-id').first()
+            last_id = last_msg.id if last_msg else 0
+
+            while True:
+                new_messages = Message.objects.filter(
+                    match__users=request.user,
+                    id__gt=last_id
+                ).exclude(sender=request.user).order_by('id')
+
+                for msg in new_messages:
+                    data = MessageSerializer(msg, context={'request': request}).data
+                    data['match_id'] = msg.match.id
+                    yield f"data: {json.dumps(data)}\n\n"
+                    last_id = msg.id
+
+                time.sleep(1)
+                yield ": keep-alive\n\n"
+
+        response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        return response

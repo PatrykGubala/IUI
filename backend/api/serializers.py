@@ -66,12 +66,28 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 class DatingProfileSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(source='profile_picture', read_only=True)
-    name = serializers.CharField(source='first_name', read_only=True)
+    firstName = serializers.CharField(source='first_name', read_only=True)
+    lastName  = serializers.CharField(source='last_name', read_only=True)
     description = serializers.CharField(source='bio', read_only=True)
+    location = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'image', 'name', 'age', 'location', 'occupation', 'university', 'description', 'tags')
+        fields = (
+            'id',
+            'image',
+            'firstName', 'lastName',
+            'age',
+            'location',
+            'occupation', 'university',
+            'description',
+            'tags',
+        )
+
+    def get_location(self, obj):
+        parts = [p for p in [obj.city, obj.country] if p]
+        return ", ".join(parts)
+
 
 class SwipeActionSerializer(serializers.Serializer):
     target_id = serializers.IntegerField()

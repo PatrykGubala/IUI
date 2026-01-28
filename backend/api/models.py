@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.conf import settings
+from pgvector.django import VectorField
+
 
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
@@ -20,6 +22,8 @@ class CustomUser(AbstractUser):
     longitude = models.FloatField(null=True, blank=True)
     city = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True)
+    profile_embedding = VectorField(dimensions=768, null=True, blank=True)
+
 
     def __str__(self):
         return self.username

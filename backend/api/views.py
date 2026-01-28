@@ -13,6 +13,19 @@ from .serializers import (
     MessageSerializer
 )
 from .utils import cosine, build_tag_vector, reverse_geocode_city, distance_km
+from .utils_embeddings import build_profile_text, get_embedding
+
+
+def refresh_profile_embedding(user):
+    text = build_profile_text(user)
+    if not text:
+        # jak nie ma treści profilu, nie ma sensu liczyć embeddingu
+        user.profile_embedding = None
+        user.save(update_fields=["profile_embedding"])
+        return
+
+    user.profile_embedding = get_embedding(text)
+    user.save(update_fields=["profile_embedding"])
 
 
 class RegisterView(generics.CreateAPIView):
@@ -30,6 +43,9 @@ class RegisterView(generics.CreateAPIView):
             user.country = country
             user.save(update_fields=["city", "country"])
 
+        refresh_profile_embedding(user)
+
+
 class UserProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -46,6 +62,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
             user.city = city
             user.country = country
             user.save(update_fields=["city", "country"])
+
+        refresh_profile_embedding(user)
 
 class PotentialMatchesView(generics.ListAPIView):
     serializer_class = DatingProfileSerializer

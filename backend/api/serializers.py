@@ -14,7 +14,6 @@ class UserSerializer(serializers.ModelSerializer):
     longitude = serializers.FloatField(required=False, allow_null=True)
     city = serializers.CharField(required=False, allow_blank=True, read_only=True)
     country = serializers.CharField(required=False, allow_blank=True, read_only=True)
-
     location = serializers.SerializerMethodField()
 
     class Meta:

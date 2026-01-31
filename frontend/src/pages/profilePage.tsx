@@ -27,28 +27,44 @@ const ProfilePage: React.FC = () => {
         location: "Kraków, Poland",
         description:
             "Computer science student passionate about exploring new technologies.",
-        profilePhoto: "https://randomuser.me/api/portraits/women/65.jpg",
+        profilePhoto: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Person_Image_Placeholder.png",
         tags: [] as string[]
     });
 
     const [newTag, setNewTag] = useState("");
 
-    const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setProfileData({
-                    ...profileData,
-                    profilePhoto: reader.result as string,
-                });
-                toaster.create({
-                    title: "Profile photo updated",
-                    type: "success",
-                    duration: 2000,
-                });
-            };
-            reader.readAsDataURL(file);
+        if(!file) return;
+
+        const formData = new FormData();
+        formData.append("profilePhoto",file);
+
+        try{
+            const res = await api.patch("user/profile/", formData, {
+                headers: {
+                    "Content-Type":"multipart/form-data",
+                },
+            });
+
+            setProfileData((prev) => ({
+                ...prev,
+                profilePhoto: res.data.profilePhoto ?? prev.profilePhoto
+            }));
+
+            toaster.create({
+                title: "Profile photo updated",
+                type: "success",
+                duration: 2000,
+            });
+        } catch (err) {
+            console.error(err);
+            toaster.create({
+                title: "Failed to upload photo",
+                type: "error",
+            });
+        } finally {
+            event.target.value = "";
         }
     };
 

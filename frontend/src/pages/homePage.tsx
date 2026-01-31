@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, {useRef} from "react";
 import {
   Box,
   Button,
@@ -18,6 +18,7 @@ import {useNavigate} from "react-router-dom";
 const HomePage: React.FC = () => {
 
   const {isAuthenticated } = useAuth();
+  const whyRef = useRef<HTMLDivElement | null>(null);
   const navigation = useNavigate();
   const handleGetStarted = () =>{
     if(!isAuthenticated){
@@ -35,6 +36,10 @@ const HomePage: React.FC = () => {
     else {
       navigation('/profile');
     }
+  };
+
+  const handleScrollToWhy = () => {
+    whyRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -93,6 +98,7 @@ const HomePage: React.FC = () => {
               _hover={{
                 bg: "pink.50",
               }}
+              onClick={handleScrollToWhy}
             >
               Learn More
             </Button>
@@ -150,7 +156,7 @@ const HomePage: React.FC = () => {
           </Box>
         </SimpleGrid>
 
-        <Box w="100%" maxW="1000px" px={6}>
+        <Box w="100%" maxW="1000px" px={6} ref={whyRef}>
           <Text
             fontSize="3xl"
             fontWeight="bold"

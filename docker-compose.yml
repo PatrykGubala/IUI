@@ -2,7 +2,7 @@
 
 services:
   db:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: dating_postgres_db
     environment:
       POSTGRES_DB: dating_appdb
@@ -12,6 +12,19 @@ services:
       - "5432:5432"
     volumes:
       - dating_db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: dating_ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
 
 volumes:
   dating_db_data:
+  ollama_data:

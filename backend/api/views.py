@@ -1,7 +1,7 @@
+import math
 from rest_framework import generics, permissions, status, views
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework_simplejwt.views import TokenObtainPairView
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.http import StreamingHttpResponse
@@ -14,13 +14,23 @@ from .serializers import (
     DatingProfileSerializer,
     SwipeActionSerializer,
     MatchListSerializer,
-    MessageSerializer,
-    CustomTokenObtainPairSerializer
+    MessageSerializer
 )
 from .utils import cosine, build_tag_vector, reverse_geocode_city, distance_km
+from .utils_embeddings import build_profile_text, get_embedding
 
-class CustomTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CustomTokenObtainPairSerializer
+
+
+def refresh_profile_embedding(user):
+    text = build_profile_text(user)
+    if not text:
+        user.profile_embedding = None
+        user.save(update_fields=["profile_embedding"])
+        return
+
+    user.profile_embedding = get_embedding(text)
+    user.save(update_fields=["profile_embedding"])
+
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
@@ -36,6 +46,9 @@ class RegisterView(generics.CreateAPIView):
             user.city = city
             user.country = country
             user.save(update_fields=["city", "country"])
+
+        refresh_profile_embedding(user)
+
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
@@ -54,6 +67,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
             user.country = country
             user.save(update_fields=["city", "country"])
 
+        refresh_profile_embedding(user)
+
 class PotentialMatchesView(generics.ListAPIView):
     serializer_class = DatingProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -71,22 +86,34 @@ class PotentialMatchesView(generics.ListAPIView):
 
         return qs
 
+    def l2_normalize(self, vec):
+        norm = math.sqrt(sum(x * x for x in vec))
+        if norm == 0:
+            return vec
+        return [x / norm for x in vec]
+
+    def dot(self, a, b):
+        return sum(x * y for x, y in zip(a, b))
+
     def list(self, request, *args, **kwargs):
         me = request.user
+        me_emb = me.profile_embedding
         max_km = 20
 
         candidates = list(self.get_queryset()[:5000])
 
+        # --- filtr odległości ---
         if me.latitude is not None and me.longitude is not None:
             filtered = []
             for c in candidates:
                 if c.latitude is None or c.longitude is None:
-                    continue
+                    continue  # nie znamy pozycji -> nie pokazujemy
                 d = distance_km(me.latitude, me.longitude, c.latitude, c.longitude)
                 if d <= max_km:
                     filtered.append(c)
             candidates = filtered
 
+        # --- vocab ---
         all_tags = []
         all_tags.extend(me.tags or [])
         for c in candidates:
@@ -99,12 +126,22 @@ class PotentialMatchesView(generics.ListAPIView):
         for c in candidates:
             common_tags_count = len(set(me.tags or []) & set(c.tags or []))
             cosine_score = cosine(me_vector, build_tag_vector(c.tags, vocab))
-            final_score = 0.4 * common_tags_count + 0.6 * cosine_score
+
+            emb_score = 0.0
+            if me_emb is not None and c.profile_embedding is not None:
+                emb_score = self.dot(me_emb, c.profile_embedding)
+
+            final_score = (
+                    0.2 * common_tags_count +
+                    0.3 * cosine_score +
+                    0.5 * emb_score
+            )
 
             scored_candidates.append({
                 "score": round(final_score, 4),
                 "common": common_tags_count,
                 "cosine": round(cosine_score, 4),
+                "emb": round(emb_score, 4),
                 "user": self.get_serializer(c).data,
             })
 

@@ -2,6 +2,7 @@ import math
 from rest_framework import generics, permissions, status, views
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework_simplejwt.views import TokenObtainPairView
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.http import StreamingHttpResponse
@@ -14,7 +15,8 @@ from .serializers import (
     DatingProfileSerializer,
     SwipeActionSerializer,
     MatchListSerializer,
-    MessageSerializer
+    MessageSerializer,
+    CustomTokenObtainPairSerializer
 )
 from .utils import cosine, build_tag_vector, reverse_geocode_city, distance_km
 from .utils_embeddings import build_profile_text, get_embedding
@@ -31,6 +33,8 @@ def refresh_profile_embedding(user):
     user.profile_embedding = get_embedding(text)
     user.save(update_fields=["profile_embedding"])
 
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()

@@ -101,7 +101,7 @@ const ProfilePage: React.FC = () => {
                 firstName: profileData.firstName,
                 lastName: profileData.lastName,
                 age: profileData.age,
-                bio: profileData.description,
+                description: profileData.description,
                 gender: profileData.gender,
                 interestedIn: profileData.interestedIn,
                 tags: profileData.tags

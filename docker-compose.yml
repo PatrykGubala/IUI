@@ -14,5 +14,17 @@ services:
       - dating_db_data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: dating_ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
 volumes:
   dating_db_data:
+  ollama_data:

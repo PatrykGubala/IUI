@@ -16,6 +16,7 @@ import {
 } from "@chakra-ui/react";
 import { toaster } from "../components/ui/toaster";
 import api from "./../contexts/AxiosInstance";
+import { TAG_GROUPS } from "./registerPage";
 
 const ProfilePage: React.FC = () => {
     const [profileData, setProfileData] = useState({
@@ -31,8 +32,6 @@ const ProfilePage: React.FC = () => {
         profilePhoto: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Person_Image_Placeholder.png",
         tags: [] as string[]
     });
-
-    const [newTag, setNewTag] = useState("");
 
     const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -69,20 +68,13 @@ const ProfilePage: React.FC = () => {
         }
     };
 
-    const handleAddTag = () => {
-        if (newTag.trim() && !profileData.tags.includes(newTag.trim())) {
-            setProfileData({
-                ...profileData,
-                tags: [...profileData.tags, newTag.trim()]
-            });
-            setNewTag("");
-        }
-    };
-
-    const handleRemoveTag = (tagToRemove: string) => {
-        setProfileData({
-            ...profileData,
-            tags: profileData.tags.filter((tag) => tag !== tagToRemove)
+    const handleTagToggle = (tag: string) => {
+        setProfileData((prev) => {
+            const currentTags = prev.tags || [];
+            const newTags = currentTags.includes(tag)
+                ? currentTags.filter((t) => t !== tag)
+                : [...currentTags, tag];
+            return { ...prev, tags: newTags };
         });
     };
 
@@ -352,7 +344,6 @@ const ProfilePage: React.FC = () => {
                             </Editable.Root>
                         </Field.Root>
 
-
                         <Field.Root>
                             <Field.Label color="gray.700" fontWeight="600">
                                 Max distance (km)
@@ -414,52 +405,34 @@ const ProfilePage: React.FC = () => {
                     <Text fontSize="xl" fontWeight="semibold" color="pink.600" mb={4}>
                         Interests & Hobbies
                     </Text>
-                    <Wrap gap={3} mb={4}>
-                        {profileData.tags && profileData.tags.map((tag, index) => (
-                            <WrapItem key={index}>
-                                <Tag.Root
-                                    size="lg"
-                                    borderRadius="full"
-                                    variant="solid"
-                                    colorPalette="pink"
-                                    px={4}
-                                    py={2}
-                                >
-                                    <Tag.Label>{tag}</Tag.Label>
-                                    <Tag.EndElement>
-                                        <Tag.CloseTrigger onClick={() => handleRemoveTag(tag)} />
-                                    </Tag.EndElement>
-                                </Tag.Root>
-                            </WrapItem>
-                        ))}
-                    </Wrap>
-                    <HStack>
-                        <Input
-                            value={newTag}
-                            onChange={(e) => setNewTag(e.target.value)}
-                            placeholder="Add a new tag..."
-                            borderRadius="lg"
-                            borderColor="pink.300"
-                            _hover={{ borderColor: "pink.400" }}
-                            _focus={{
-                                borderColor: "pink.400",
-                                boxShadow: "0 0 0 1px #f687b3",
-                            }}
-                            onKeyPress={(e) => {
-                                if (e.key === "Enter") {
-                                    handleAddTag();
-                                }
-                            }}
-                        />
-                        <Button
-                            onClick={handleAddTag}
-                            colorPalette="pink"
-                            borderRadius="lg"
-                            px={8}
-                        >
-                            Add
-                        </Button>
-                    </HStack>
+
+                    {Object.entries(TAG_GROUPS).map(([group, tags]) => (
+                        <Box key={group} mb={4}>
+                            <Text fontWeight="bold" fontSize="sm" color="pink.500" mb={2}>
+                                {group}
+                            </Text>
+                            <Wrap gap={2}>
+                                {tags.map((tag) => (
+                                    <WrapItem key={tag}>
+                                        <Tag.Root
+                                            size="lg"
+                                            borderRadius="full"
+                                            variant={profileData.tags?.includes(tag) ? "solid" : "outline"}
+                                            colorPalette="pink"
+                                            cursor="pointer"
+                                            onClick={() => handleTagToggle(tag)}
+                                            px={4}
+                                            py={2}
+                                            transition="all 0.2s"
+                                            _hover={{ transform: "scale(1.05)" }}
+                                        >
+                                            <Tag.Label>{tag}</Tag.Label>
+                                        </Tag.Root>
+                                    </WrapItem>
+                                ))}
+                            </Wrap>
+                        </Box>
+                    ))}
                 </Box>
 
                 <Button

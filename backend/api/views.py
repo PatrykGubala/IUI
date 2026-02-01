@@ -19,19 +19,10 @@ from .serializers import (
     CustomTokenObtainPairSerializer
 )
 from .utils import cosine, build_tag_vector, reverse_geocode_city, distance_km
-from .utils_embeddings import build_profile_text, get_embedding
+from .utils_embeddings import refresh_profile_embedding, dot, refresh_profile_embedding_async
+from django.db import transaction
 
 
-
-def refresh_profile_embedding(user):
-    text = build_profile_text(user)
-    if not text:
-        user.profile_embedding = None
-        user.save(update_fields=["profile_embedding"])
-        return
-
-    user.profile_embedding = get_embedding(text)
-    user.save(update_fields=["profile_embedding"])
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -51,7 +42,7 @@ class RegisterView(generics.CreateAPIView):
             user.country = country
             user.save(update_fields=["city", "country"])
 
-        refresh_profile_embedding(user)
+        transaction.on_commit(lambda: refresh_profile_embedding_async(user.id))
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -71,7 +62,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
             user.country = country
             user.save(update_fields=["city", "country"])
 
-        refresh_profile_embedding(user)
+        transaction.on_commit(lambda: refresh_profile_embedding_async(user.id))
+
 
 class PotentialMatchesView(generics.ListAPIView):
     serializer_class = DatingProfileSerializer
@@ -89,15 +81,6 @@ class PotentialMatchesView(generics.ListAPIView):
         qs = qs.filter(interested_in__contains=[me.gender])
 
         return qs
-
-    def l2_normalize(self, vec):
-        norm = math.sqrt(sum(x * x for x in vec))
-        if norm == 0:
-            return vec
-        return [x / norm for x in vec]
-
-    def dot(self, a, b):
-        return sum(x * y for x, y in zip(a, b))
 
     def list(self, request, *args, **kwargs):
         me = request.user
@@ -133,11 +116,11 @@ class PotentialMatchesView(generics.ListAPIView):
 
             emb_score = 0.0
             if me_emb is not None and c.profile_embedding is not None:
-                emb_score = self.dot(me_emb, c.profile_embedding)
+                emb_score = dot(me_emb, c.profile_embedding)
 
             final_score = (
-                    0.2 * common_tags_count +
-                    0.3 * cosine_score +
+                    0.1 * common_tags_count +
+                    0.4 * cosine_score +
                     0.5 * emb_score
             )
 

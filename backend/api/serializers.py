@@ -36,7 +36,6 @@ class UserSerializer(serializers.ModelSerializer):
     city = serializers.CharField(required=False, allow_blank=True, read_only=True)
     country = serializers.CharField(required=False, allow_blank=True, read_only=True)
     interestedIn = serializers.ListField(source='interested_in', child=serializers.CharField(), required=False)
-
     location = serializers.SerializerMethodField()
 
     class Meta:
@@ -87,6 +86,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def validate_age(self, value):
         if value < 18:
             raise serializers.ValidationError("Must be 18+")
+        if value >= 100:
+            raise serializers.ValidationError("Must be less than 100")
         return value
 
     def create(self, validated_data):

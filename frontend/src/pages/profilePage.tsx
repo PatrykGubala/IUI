@@ -17,6 +17,13 @@ import {
 import { toaster } from "../components/ui/toaster";
 import api from "./../contexts/AxiosInstance";
 
+
+const regex = {
+    name: /^[a-zA-Z\s-]+$/,
+}
+
+const MAX_DESCRIPTION_LENGTH = 500;
+
 const ProfilePage: React.FC = () => {
     const [profileData, setProfileData] = useState({
         firstName: "Jan",
@@ -33,6 +40,7 @@ const ProfilePage: React.FC = () => {
     });
 
     const [newTag, setNewTag] = useState("");
+    const [errors, setErrors] = useState<Record<string,string>>({});
 
     const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -86,6 +94,35 @@ const ProfilePage: React.FC = () => {
         });
     };
 
+    const validateUserData = () => {
+        const newErrors: Record<string,string> = {};
+        let isValid = true;
+
+        if(!regex.name.test(profileData.firstName)){
+            newErrors.firstName = "Name contains prohibited characters! Use only letters."
+            isValid = false;
+        }
+        if(!regex.name.test(profileData.lastName)){
+            newErrors.lastName = "Surname contains prohibited characters! Use only letters."
+            isValid = false;
+        }
+        if(profileData.description.length > MAX_DESCRIPTION_LENGTH){
+            newErrors.description = "Your description is too long.";
+            isValid = false;
+        }
+        if(profileData.age<18){
+            newErrors.age = "You need to be older than 18 years old!";
+            isValid = false;
+        }
+        if(profileData.max_distance<=0){
+            newErrors.distance = "Max distance must be greater than 1 km!";
+            isValid = false;
+        }
+
+        setErrors(newErrors);
+        return isValid;
+    }
+
     const handleInterestToggle = (gender: string) => {
         setProfileData(prev => {
             const current = prev.interestedIn || [];
@@ -98,6 +135,16 @@ const ProfilePage: React.FC = () => {
 
     const handleSave = async () => {
         try {
+            if(!validateUserData()) {
+                Object.values(errors).forEach(error => {
+                    toaster.create({
+                        title: error,
+                        type: "error",
+                        duration: 4000,
+                    });
+                });
+                return;
+            };
             await api.put('user/profile/', {
                 firstName: profileData.firstName,
                 lastName: profileData.lastName,

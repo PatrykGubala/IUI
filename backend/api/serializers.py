@@ -41,7 +41,7 @@ class UserSerializer(serializers.ModelSerializer):
             'age', 'gender', 'interestedIn',
             'location', 'latitude', 'longitude',
             'city', 'country', 'tags',
-            'occupation', 'university', 'max_distance',
+            'occupation', 'university', 'max_distance','max_age_diff',
         )
         read_only_fields = ('role', 'username', 'email')
 

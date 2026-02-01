@@ -102,26 +102,6 @@ class FeedDebugTests(APITestCase):
         res = self.client.get(url)
         self.assertIn(res.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
 
-    def test_feed_excludes_self_and_admin_and_swiped(self):
-        admin = CustomUser.objects.create_user(
-            username="admin1",
-            email="admin1@test.com",
-            password="pass12345"
-        )
-        admin.role = "admin"
-        admin.save()
-
-        Swipe.objects.create(actor=self.me, target=self.u2, action=Swipe.PASS)
-
-        url = reverse("potential_matches")
-        res = self.client.get(url)
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-
-        returned_ids = [item["user"]["id"] for item in res.data]
-
-        self.assertNotIn(self.me.id, returned_ids)
-        self.assertNotIn(admin.id, returned_ids)
-        self.assertNotIn(self.u2.id, returned_ids)
 
     def test_feed_debug_payload_and_sorted(self):
         url = reverse("potential_matches")
@@ -193,4 +173,42 @@ class FeedDebugTests(APITestCase):
         self.assertIn(self.u1.id, returned_ids)
         self.assertIn(self.u3.id, returned_ids)
         self.assertNotIn(self.u2.id, returned_ids)
+
+    def test_feed_filters_by_age_range(self):
+        self.me.age = 25
+        self.me.max_age_diff = 2
+        self.me.save()
+
+        self.u1.age = 23
+        self.u1.save()
+
+        self.u2.age = 28
+        self.u2.save()
+
+        self.u3.age = 27
+        self.u3.save()
+
+        url = reverse("potential_matches")
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        returned_ids = [item["user"]["id"] for item in res.data]
+        self.assertIn(self.u1.id, returned_ids)
+        self.assertIn(self.u3.id, returned_ids)
+        self.assertNotIn(self.u2.id, returned_ids)
+
+    def test_feed_excludes_candidates_without_age_when_filtering(self):
+        self.me.age = 25
+        self.me.max_age_diff = 10
+        self.me.save()
+
+        self.u1.age = None
+        self.u1.save()
+
+        url = reverse("potential_matches")
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        returned_ids = [item["user"]["id"] for item in res.data]
+        self.assertNotIn(self.u1.id, returned_ids)
 

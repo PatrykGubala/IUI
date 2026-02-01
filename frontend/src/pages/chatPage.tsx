@@ -293,14 +293,6 @@ const ChatPage: React.FC = () => {
                                     {activeMatch.name}
                                 </Text>
                             </Flex>
-                            <Button
-                                colorScheme="pink"
-                                variant="ghost"
-                                borderRadius="full"
-                                fontWeight="600"
-                            >
-                                Plan a date
-                            </Button>
                         </Flex>
                         <Text fontSize="sm" color="gray.500" mb={4}>
                             Keep the conversation going!

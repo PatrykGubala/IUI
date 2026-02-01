@@ -1,98 +1,112 @@
 import axios, { AxiosError } from "axios";
-import type { InternalAxiosRequestConfig } from "axios";
+import type { AxiosInstance, InternalAxiosRequestConfig} from "axios";
 
-const api = axios.create({
-    baseURL: "http://localhost:8000/api/",
-    headers: { "Content-Type": "application/json" },
-});
+const API_BASE_URL = "http://localhost:8000/api/";
+const TOKEN_ACCESS_KEY = "access";
+const TOKEN_REFRESH_KEY = "refresh";
+const AUTH_HEADER = "Authorization";
+const BEARER_PREFIX = "Bearer ";
+const REFRESH_ENDPOINT = 'auth/refresh/';
 
-const TOKEN_KEY = "access";
-const REFRESH_KEY = "refresh";
+interface AuthConfig extends InternalAxiosRequestConfig {
+    _retry?: boolean;
+}
 
-let isRefreshing = false;
-let pendingRequests: ((token: string | null) => void)[] = [];
+interface RefreshResponse {
+    access: string;
+}
 
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token) {
-        config.headers = config.headers ?? {};
-        config.headers.Authorization = `Bearer ${token}`;
-    }
+const authStorage = {
+    getAccess: (): string | null => localStorage.getItem(TOKEN_ACCESS_KEY),
+    getRefresh: (): string | null => localStorage.getItem(TOKEN_REFRESH_KEY),
+    setAccess: (token: string): void => localStorage.setItem(TOKEN_ACCESS_KEY, token),
+    clear: (): void => {
+        localStorage.removeItem(TOKEN_ACCESS_KEY);
+        localStorage.removeItem(TOKEN_REFRESH_KEY);
+    },
+};
+
+const tokenRefreshService = {
+    async refresh(client: AxiosInstance): Promise<string> {
+        const refreshToken = authStorage.getRefresh();
+        if (!refreshToken) throw new Error("No refresh token available");
+
+        const { data } = await client.post<RefreshResponse>(REFRESH_ENDPOINT, { refresh: refreshToken });
+        return data.access;
+    },
+};
+
+const setAuthHeader = (config: InternalAxiosRequestConfig, token: string): InternalAxiosRequestConfig => {
+    config.headers ??= {};
+    config.headers[AUTH_HEADER] = `${BEARER_PREFIX}${token}`;
     return config;
-});
+};
 
-api.interceptors.response.use(
-    (response) => response,
-    async (error: AxiosError) => {
-        const originalRequest = error.config as (InternalAxiosRequestConfig & {
-            _retry?: boolean;
-        });
+const createAuthInterceptors = (client: AxiosInstance) => {
+    let isRefreshing = false;
+    let pendingRequests: Array<(token: string | null) => void> = [];
 
-        if (!error.response || error.response.status !== 401) {
+    const requestInterceptor = (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
+        const token = authStorage.getAccess();
+        if (token) setAuthHeader(config, token);
+        return config;
+    };
+
+    const responseInterceptor = async (error: AxiosError): Promise<any> => {
+        const config = error.config as AuthConfig;
+        if (!error.response?.status || error.response.status !== 401 || !config) {
             return Promise.reject(error);
         }
 
-        if (originalRequest._retry) {
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(REFRESH_KEY);
+        if (config._retry) {
+            authStorage.clear();
             window.location.href = "/login";
             return Promise.reject(error);
         }
 
-        originalRequest._retry = true;
+        config._retry = true;
 
         if (isRefreshing) {
             return new Promise((resolve, reject) => {
                 pendingRequests.push((newToken) => {
-                    if (!newToken) {
-                        reject(error);
-                        return;
-                    }
-                    originalRequest.headers = originalRequest.headers ?? {};
-                    originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                    resolve(api(originalRequest));
+                    if (!newToken) return reject(error);
+                    setAuthHeader(config, newToken);
+                    resolve(client(config));
                 });
             });
         }
 
         isRefreshing = true;
-        const refresh = localStorage.getItem(REFRESH_KEY);
-
-        if (!refresh) {
-            isRefreshing = false;
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(REFRESH_KEY);
-            window.location.href = "/login";
-            return Promise.reject(error);
-        }
 
         try {
-            const res = await axios.post("auth/refresh/", {
-                refresh,
-            });
-
-            const newAccess = (res.data as { access: string }).access;
-
-            localStorage.setItem(TOKEN_KEY, newAccess);
-            api.defaults.headers.Authorization = `Bearer ${newAccess}`;
-
-            pendingRequests.forEach((cb) => cb(newAccess));
+            const newToken = await tokenRefreshService.refresh(client);
+            authStorage.setAccess(newToken);
+            pendingRequests.forEach((cb) => cb(newToken));
             pendingRequests = [];
-            isRefreshing = false;
-
-            originalRequest.headers = originalRequest.headers ?? {};
-            originalRequest.headers.Authorization = `Bearer ${newAccess}`;
-            return api(originalRequest);
+            setAuthHeader(config, newToken);
+            return client(config);
         } catch (refreshError) {
-            isRefreshing = false;
             pendingRequests.forEach((cb) => cb(null));
             pendingRequests = [];
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(REFRESH_KEY);
+            authStorage.clear();
             window.location.href = "/login";
             return Promise.reject(refreshError);
+        } finally {
+            isRefreshing = false;
         }
-    }
-);
+    };
+
+    return { requestInterceptor, responseInterceptor };
+};
+
+const api: AxiosInstance = axios.create({
+    baseURL: API_BASE_URL,
+    headers: { "Content-Type": "application/json" },
+});
+
+const { requestInterceptor, responseInterceptor } = createAuthInterceptors(api);
+
+api.interceptors.request.use(requestInterceptor);
+api.interceptors.response.use((response) => response, responseInterceptor);
 
 export default api;

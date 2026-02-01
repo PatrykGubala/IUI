@@ -12,42 +12,8 @@ import { FaHeart, FaTimes, FaChevronRight } from "react-icons/fa";
 import { toaster } from "./../components/ui/toaster";
 import api from "./../contexts/AxiosInstance.ts";
 
-// const dummyData = [
-//   {
-//     image: "https://randomuser.me/api/portraits/women/79.jpg",
-//     name: "Emma",
-//     age: 26,
-//     location: "Los Angeles, CA",
-//     occupation: "Marketing Manager",
-//     university: "UCLA",
-//     description:
-//       "Beach lover 🏄‍♀️ | Fitness enthusiast | Dog mom to a golden retriever | Looking for my adventure partner",
-//     tags: ["Fitness", "Dogs", "Beach", "Marketing"],
-//   },
-//   {
-//     image: "https://randomuser.me/api/portraits/men/32.jpg",
-//     name: "James",
-//     age: 29,
-//     location: "New York, NY",
-//     occupation: "Software Engineer",
-//     university: "NYU",
-//     description:
-//       "Tech geek 🤓 | Coffee lover | Gamer | Looking for someone to share adventures and code with",
-//     tags: ["Tech", "Gaming", "Coffee", "Coding"],
-//   },
-//   {
-//     image: "https://randomuser.me/api/portraits/women/65.jpg",
-//     name: "Sophia",
-//     age: 24,
-//     location: "Chicago, IL",
-//     occupation: "Graphic Designer",
-//     university: "SAIC",
-//     description:
-//       "Art lover 🎨 | Wine enthusiast | Avid reader | Seeking creativity and fun",
-//     tags: ["Art", "Wine", "Books", "Design"],
-//   },
-// ];
 
+const IMAGE_PLACEHOLDER = "https://upload.wikimedia.org/wikipedia/commons/a/a2/Person_Image_Placeholder.png" as const;
 
 type FeedItem = {
   common: number,
@@ -220,13 +186,38 @@ const HomePage: React.FC = () => {
   };
 
   const handleSwipe = async (action: "LIKE" | "PASS") => {
-    const current = matches[index];
-    if(!current) return;
+    setMatches((prev) => {
+      const current = prev[index];
+      if(!current) return;
 
-    await sendSwipe(current.id, action);
+      sendSwipe(current.id, action);
 
-    handleNext();
+      const updated = [...prev];
+      updated.splice(index,1);
+
+      const newIndex = Math.min(index, Math.max(updated.length-1,0));
+      setIndex(newIndex);
+
+      return updated;
+    });
   }
+
+  const normalizeFeedItem = (item: FeedItem): MatchCard => {
+    const u = item.user;
+
+    return {
+      id: u.id,
+      image: u.image ?? IMAGE_PLACEHOLDER,
+      firstName: u.firstName ?? "unknown",
+      lastName: u.lastName ?? "unknown",
+      age: u.age ?? 0,
+      location: u.location ?? "",
+      occupation: u.occupation ?? "",
+      university: u.university ?? "",
+      description: u.description ?? "",
+      tags: Array.isArray(u.tags) ? u.tags : [],
+    };
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -234,25 +225,7 @@ const HomePage: React.FC = () => {
         setLoading(true);
         const matchResponse = await api.get<FeedItem[]>('dating/feed/');
 
-        const normalized: MatchCard[] = matchResponse.data.map((item) => {
-          const u = item.user ?? {};
-
-          return {
-            id: u.id,
-            image: u.image ?? "https://upload.wikimedia.org/wikipedia/commons/a/a2/Person_Image_Placeholder.png",
-            firstName: u.firstName ?? "unknown",
-            lastName: u.lastName ?? "unknown",
-            age: u.age ?? 0,
-            location: u.location ?? "",
-            occupation: u.occupation ?? "",
-            university: u.university ?? "",
-            description: u.description ?? "",
-            tags: Array.isArray(u.tags) ? u.tags : [],
-          };
-        });
-
-        setMatches(normalized);
-        console.log(matchResponse.data)
+        setMatches(matchResponse.data.map(normalizeFeedItem));
         setIndex(0);
       } catch (err) {
         console.error(err);

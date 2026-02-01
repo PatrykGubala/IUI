@@ -25,6 +25,7 @@ const ProfilePage: React.FC = () => {
         gender: "M",
         interestedIn: [] as string[],
         location: "Kraków, Poland",
+        max_distance: 50,
         description:
             "Computer science student passionate about exploring new technologies.",
         profilePhoto: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Person_Image_Placeholder.png",
@@ -104,6 +105,7 @@ const ProfilePage: React.FC = () => {
                 description: profileData.description,
                 gender: profileData.gender,
                 interestedIn: profileData.interestedIn,
+                max_distance: profileData.max_distance,
                 tags: profileData.tags
             });
             toaster.create({
@@ -337,6 +339,40 @@ const ProfilePage: React.FC = () => {
                                     cursor="pointer"
                                 />
                                 <Editable.Input
+                                    px={3}
+                                    py={2}
+                                    fontSize="lg"
+                                    borderRadius="lg"
+                                    borderColor="pink.300"
+                                    _focus={{
+                                        borderColor: "pink.400",
+                                        boxShadow: "0 0 0 1px #f687b3",
+                                    }}
+                                />
+                            </Editable.Root>
+                        </Field.Root>
+
+
+                        <Field.Root>
+                            <Field.Label color="gray.700" fontWeight="600">
+                                Max distance (km)
+                            </Field.Label>
+                            <Editable.Root
+                                value={profileData.max_distance?.toString()}
+                                onValueChange={(e) =>
+                                    setProfileData({ ...profileData, max_distance: parseInt(e.value) })
+                                }
+                            >
+                                <Editable.Preview
+                                    px={3}
+                                    py={2}
+                                    fontSize="lg"
+                                    borderRadius="lg"
+                                    _hover={{ bg: "pink.50" }}
+                                    cursor="pointer"
+                                />
+                                <Editable.Input
+                                    type="number"
                                     px={3}
                                     py={2}
                                     fontSize="lg"

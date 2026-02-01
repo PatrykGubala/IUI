@@ -1,26 +1,27 @@
-import math
-from rest_framework import generics, permissions, status, views
-from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework_simplejwt.views import TokenObtainPairView
-from django.shortcuts import get_object_or_404
-from django.db.models import Q
-from django.http import StreamingHttpResponse
 import json
+import math
 import time
-from .models import CustomUser, Match, Swipe, Message
+
+from django.db import transaction
+from django.http import StreamingHttpResponse
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, permissions, status, views
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+from .models import CustomUser, Match, Message, Swipe
 from .serializers import (
-    UserRegistrationSerializer,
-    UserSerializer,
+    CustomTokenObtainPairSerializer,
     DatingProfileSerializer,
-    SwipeActionSerializer,
     MatchListSerializer,
     MessageSerializer,
-    CustomTokenObtainPairSerializer
+    SwipeActionSerializer,
+    UserRegistrationSerializer,
+    UserSerializer,
 )
-from .utils import cosine, build_tag_vector, reverse_geocode_city, distance_km
-from .utils_embeddings import refresh_profile_embedding, dot, refresh_profile_embedding_async
-from django.db import transaction
+from .utils import build_tag_vector, cosine, distance_km, reverse_geocode_city
+from .utils_embeddings import dot, refresh_profile_embedding_async
 
 
 
@@ -54,6 +55,9 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
     def perform_update(self, serializer):
+        bio_in_payload = "bio" in serializer.validated_data
+        bio_changed = bio_in_payload and (serializer.validated_data["bio"] != serializer.instance.bio)
+
         user = serializer.save()
 
         if user.latitude is not None and user.longitude is not None:
@@ -62,7 +66,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
             user.country = country
             user.save(update_fields=["city", "country"])
 
-        transaction.on_commit(lambda: refresh_profile_embedding_async(user.id))
+        if bio_changed:
+            transaction.on_commit(lambda: refresh_profile_embedding_async(user.id))
 
 
 class PotentialMatchesView(generics.ListAPIView):
@@ -79,7 +84,6 @@ class PotentialMatchesView(generics.ListAPIView):
             qs = qs.filter(gender__in=me.interested_in)
 
         qs = qs.filter(interested_in__contains=[me.gender])
-
         return qs
 
     def list(self, request, *args, **kwargs):
@@ -96,18 +100,16 @@ class PotentialMatchesView(generics.ListAPIView):
 
         candidates = list(self.get_queryset()[:5000])
 
-        # --- filtr odległości ---
         if me.latitude is not None and me.longitude is not None:
             filtered = []
             for c in candidates:
                 if c.latitude is None or c.longitude is None:
-                    continue  # nie znamy pozycji -> nie pokazujemy
+                    continue
                 d = distance_km(me.latitude, me.longitude, c.latitude, c.longitude)
                 if d <= max_km:
                     filtered.append(c)
             candidates = filtered
 
-        # --- vocab ---
         all_tags = []
         all_tags.extend(me.tags or [])
         for c in candidates:

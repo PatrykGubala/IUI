@@ -1,24 +1,3 @@
-export interface MatchItem {
-    match_id: number;
-    name: string;
-    subtitle: string;
-    time: string;
-    message: string;
-    avatar: string | null;
-}
-
-export type MessageType = "incoming" | "outgoing";
-
-export interface MessageItem {
-    id: number;
-    user: string;
-    content: string;
-    time: string;
-    type: MessageType;
-    match_id?: number;
-}
-
-
 export interface FeedUser {
     id: number;
     image: string;
@@ -38,5 +17,3 @@ export interface FeedItem {
     score: number;
     user: FeedUser;
 }
-
-export interface MatchCard extends FeedUser {}

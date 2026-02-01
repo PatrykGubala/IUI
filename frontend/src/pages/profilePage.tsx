@@ -81,20 +81,13 @@ const ProfilePage: React.FC = () => {
         }
     };
 
-    const handleAddTag = () => {
-        if (newTag.trim() && !profileData.tags.includes(newTag.trim())) {
-            setProfileData({
-                ...profileData,
-                tags: [...profileData.tags, newTag.trim()]
-            });
-            setNewTag("");
-        }
-    };
-
-    const handleRemoveTag = (tagToRemove: string) => {
-        setProfileData({
-            ...profileData,
-            tags: profileData.tags.filter((tag) => tag !== tagToRemove)
+    const handleTagToggle = (tag: string) => {
+        setProfileData((prev) => {
+            const currentTags = prev.tags || [];
+            const newTags = currentTags.includes(tag)
+                ? currentTags.filter((t) => t !== tag)
+                : [...currentTags, tag];
+            return { ...prev, tags: newTags };
         });
     };
 

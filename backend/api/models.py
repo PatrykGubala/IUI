@@ -32,6 +32,7 @@ class CustomUser(AbstractUser):
     country = models.CharField(max_length=100, blank=True)
     profile_embedding = VectorField(dimensions=768, null=True, blank=True)
     max_distance = models.IntegerField(default=20)
+    max_age_diff = models.IntegerField(default=5)
 
     def __str__(self):
         return self.username

@@ -78,6 +78,7 @@ class PotentialMatchesView(generics.ListAPIView):
         current_user = request.user
         candidates = self._get_candidates(current_user)
         candidates = self._filter_by_distance(current_user, candidates)
+        candidates = self._filter_by_age(current_user, candidates)
 
         scored_candidates = self._score_candidates(current_user, candidates)
 
@@ -97,6 +98,22 @@ class PotentialMatchesView(generics.ListAPIView):
             queryset = queryset.filter(gender__in=user.interested_in)
 
         return list(queryset.filter(interested_in__contains=[user.gender])[:MAX_CANDIDATES])
+
+    def _filter_by_age(self, user, candidates):
+        if user.age is None:
+            return candidates
+
+        max_diff = getattr(user, "max_age_diff", None)
+        if max_diff is None:
+            return candidates
+
+        min_age = user.age - max_diff
+        max_age = user.age + max_diff
+
+        return [
+            c for c in candidates
+            if c.age is not None and min_age <= c.age <= max_age
+        ]
 
     def _filter_by_distance(self, user, candidates):
         if user.latitude is None or user.longitude is None:

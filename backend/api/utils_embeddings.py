@@ -2,9 +2,9 @@
 from collections.abc import Sequence
 import threading
 from django.db import close_old_connections
-OLLAMA_URL = "http://localhost:11434//api/embed"
-EMBED_MODEL = "nomic-embed-text"
 
+OLLAMA_URL = "http://localhost:11434/api/embed"
+EMBED_MODEL = "nomic-embed-text"
 
 
 def l2_normalize(vec: Sequence[float]) -> list[float]:
@@ -24,6 +24,7 @@ def refresh_profile_embedding_async(user_id: int) -> None:
         user = User.objects.get(pk=user_id)
         refresh_profile_embedding(user)
 
+
     t = threading.Thread(target=_job, daemon=True)
     t.start()
 
@@ -34,7 +35,7 @@ def refresh_profile_embedding(user):
         user.save(update_fields=["profile_embedding"])
         return
 
-    user.profile_embedding = get_embedding(text)
+    user.profile_embedding = l2_normalize(get_embedding(text))
     user.save(update_fields=["profile_embedding"])
 
 def build_profile_text(user: "CustomUser") -> str:
@@ -44,7 +45,7 @@ def build_profile_text(user: "CustomUser") -> str:
 def get_embedding(text: str) -> list[float]:
     r = requests.post(
         OLLAMA_URL,
-        json={"model": EMBED_MODEL, "input": text},
+        json={"model": EMBED_MODEL, "input": [text]},
         timeout=30,
     )
     r.raise_for_status()
@@ -52,9 +53,6 @@ def get_embedding(text: str) -> list[float]:
 
     if "embeddings" in data:
         return data["embeddings"][0]
-
-    if "embedding" in data:
-        return data["embedding"]
 
     raise KeyError(f"Unexpected Ollama response keys: {list(data.keys())}")
 

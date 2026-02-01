@@ -17,6 +17,8 @@ import {
 import { toaster } from "../components/ui/toaster";
 import api from "./../contexts/AxiosInstance";
 import { TAG_GROUPS } from "./registerPage";
+import {MapPicker} from "../components/MapPicker/MapPicker";
+import type {Coordinates} from "../components/MapPicker/mapPicker.types"
 
 
 const regex = {
@@ -40,6 +42,8 @@ const ProfilePage: React.FC = () => {
         tags: [] as string[]
     });
 
+    const [coords, setCoords] = useState<Coordinates | null>(null);
+    const [showMap, setShowMap] = useState<boolean>(false);
     const [errors, setErrors] = useState<Record<string,string>>({});
 
     const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,6 +135,30 @@ const ProfilePage: React.FC = () => {
                 : [...current, gender];
             return { ...prev, interestedIn: updated };
         });
+    };
+
+    const handleSetLocation = async () =>{
+        try {
+            const res = await api.patch('user/profile/',{
+                latitude: coords.lat,
+                longitude: coords.lng,
+            });
+
+            setProfileData(res.data)
+            toaster.create({
+                title: "Location saved successfully",
+                type: "success",
+                duration: 2000,
+            });
+
+        } catch (err) {
+            toaster.create({
+                title: "Failed to save profile",
+                type: "error",
+            });
+            console.error(err);
+        }
+
     };
 
     const handleSave = async () => {
@@ -371,32 +399,56 @@ const ProfilePage: React.FC = () => {
                             <Field.Label color="gray.700" fontWeight="600">
                                 Location
                             </Field.Label>
-                            <Editable.Root
-                                value={profileData.location}
-                                onValueChange={(e) =>
-                                    setProfileData({ ...profileData, location: e.value })
-                                }
-                            >
-                                <Editable.Preview
+                            <Box>
+                                <Box
                                     px={3}
                                     py={2}
                                     fontSize="lg"
                                     borderRadius="lg"
+                                    bg={showMap ? "pink.100" : "transparent"}
                                     _hover={{ bg: "pink.50" }}
                                     cursor="pointer"
-                                />
-                                <Editable.Input
-                                    px={3}
-                                    py={2}
-                                    fontSize="lg"
-                                    borderRadius="lg"
-                                    borderColor="pink.300"
-                                    _focus={{
-                                        borderColor: "pink.400",
-                                        boxShadow: "0 0 0 1px #f687b3",
-                                    }}
-                                />
-                            </Editable.Root>
+                                    onClick={() => setShowMap(!showMap)}
+                                    border="1px solid"
+                                    borderColor="pink.200"
+                                    minW = "400px"
+                                >
+                                    <Text>
+                                        {profileData.location}
+                                    </Text>
+                                </Box>
+                                {showMap && (
+                                    <Box px={3} py={3} mt={4} border="1px solid" borderColor="pink.200" borderRadius="xl" overflow="hidden">
+                                        <MapPicker value={coords} onChange={setCoords} />
+                                        <HStack mt={4} justify="space-around" gap={3}>
+                                            <Button
+                                                onClick={() => setShowMap(!showMap)}
+                                                variant="outline"
+                                                colorScheme="gray"
+                                                borderRadius="full"
+                                                px={6}
+                                                w="45%"
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                onClick={handleSetLocation}
+                                                colorScheme="pink"
+                                                borderRadius="full"
+                                                px={6}
+                                                boxShadow="0 4px 12px 0px rgba(238, 63, 155, 0.20)"
+                                                _hover={{
+                                                    transform: "translateY(-1px)",
+                                                    boxShadow: "0 6px 16px 0px rgba(238, 63, 155, 0.25)",
+                                                }}
+                                                w="45%"
+                                            >
+                                                Save
+                                            </Button>
+                                        </HStack>
+                                    </Box>
+                                )}
+                            </Box>
                         </Field.Root>
 
                         <Field.Root>

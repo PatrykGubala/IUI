@@ -1,8 +1,6 @@
 import json
-import math
-import time
-
-from django.db import transaction
+import select
+from django.db import transaction, connection
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status, views
@@ -23,7 +21,13 @@ from .serializers import (
 from .utils import build_tag_vector, cosine, distance_km, reverse_geocode_city
 from .utils_embeddings import dot, refresh_profile_embedding_async
 
-
+WEIGHT_TAGS = 0.1
+WEIGHT_COSINE = 0.4
+WEIGHT_EMBEDDING = 0.5
+MATCH_THRESHOLD = 0.6
+MAX_CANDIDATES = 5000
+TOP_RESULTS = 50
+DB_NOTIFY_CHANNEL = "chat_updates"
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -36,15 +40,13 @@ class RegisterView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         user = serializer.save()
-
-        if user.latitude is not None and user.longitude is not None:
-            city, country = reverse_geocode_city(user.latitude, user.longitude)
-            user.city = city
-            user.country = country
-            user.save(update_fields=["city", "country"])
-
+        self._update_location(user)
         transaction.on_commit(lambda: refresh_profile_embedding_async(user.id))
 
+    def _update_location(self, user):
+        if user.latitude is not None and user.longitude is not None:
+            user.city, user.country = reverse_geocode_city(user.latitude, user.longitude)
+            user.save(update_fields=["city", "country"])
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
@@ -55,103 +57,106 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
     def perform_update(self, serializer):
-        bio_in_payload = "bio" in serializer.validated_data
-        bio_changed = bio_in_payload and (serializer.validated_data["bio"] != serializer.instance.bio)
-
+        initial_bio = serializer.instance.bio
         user = serializer.save()
 
-        if user.latitude is not None and user.longitude is not None:
-            city, country = reverse_geocode_city(user.latitude, user.longitude)
-            user.city = city
-            user.country = country
-            user.save(update_fields=["city", "country"])
+        self._update_location_if_needed(user)
 
-        if bio_changed:
+        if "description" in serializer.validated_data and user.bio != initial_bio:
             transaction.on_commit(lambda: refresh_profile_embedding_async(user.id))
 
+    def _update_location_if_needed(self, user):
+        if user.latitude and user.longitude:
+            user.city, user.country = reverse_geocode_city(user.latitude, user.longitude)
+            user.save(update_fields=["city", "country"])
 
 class PotentialMatchesView(generics.ListAPIView):
     serializer_class = DatingProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        me = self.request.user
-        swiped_ids = Swipe.objects.filter(actor=me).values_list("target_id", flat=True)
-
-        qs = CustomUser.objects.exclude(id__in=swiped_ids).exclude(id=me.id).exclude(role="admin")
-
-        if me.interested_in:
-            qs = qs.filter(gender__in=me.interested_in)
-
-        qs = qs.filter(interested_in__contains=[me.gender])
-        return qs
-
     def list(self, request, *args, **kwargs):
+        current_user = request.user
+        candidates = self._get_candidates(current_user)
+        candidates = self._filter_by_distance(current_user, candidates)
 
-        me = request.user
-        me_emb = me.profile_embedding
-        max_km = me.max_distance or 20
+        scored_candidates = self._score_candidates(current_user, candidates)
 
-        liked_me_ids = set(
-            Swipe.objects
-            .filter(target=me, action=Swipe.LIKE)
-            .values_list("actor_id", flat=True)
-        )
-
-        candidates = list(self.get_queryset()[:5000])
-
-        if me.latitude is not None and me.longitude is not None:
-            filtered = []
-            for c in candidates:
-                if c.latitude is None or c.longitude is None:
-                    continue
-                d = distance_km(me.latitude, me.longitude, c.latitude, c.longitude)
-                if d <= max_km:
-                    filtered.append(c)
-            candidates = filtered
-
-        all_tags = []
-        all_tags.extend(me.tags or [])
-        for c in candidates:
-            all_tags.extend(c.tags or [])
-        vocab = sorted(set(all_tags))
-
-        me_vector = build_tag_vector(me.tags, vocab)
-
-        scored_candidates = []
-        for c in candidates:
-            common_tags_count = len(set(me.tags or []) & set(c.tags or []))
-            cosine_score = cosine(me_vector, build_tag_vector(c.tags, vocab))
-
-            emb_score = 0.0
-            if me_emb is not None and c.profile_embedding is not None:
-                emb_score = dot(me_emb, c.profile_embedding)
-
-            final_score = (
-                    0.1 * common_tags_count +
-                    0.4 * cosine_score +
-                    0.5 * emb_score
-            )
-
-            liked_me = c.id in liked_me_ids
-            priority = 1 if (liked_me and final_score >= 0.6) else 0
-
-            scored_candidates.append({
-                "score": round(final_score, 4),
-                "priority": priority,
-                "liked_me": liked_me,
-                "common": common_tags_count,
-                "cosine": round(cosine_score, 4),
-                "emb": round(emb_score, 4),
-                "user": self.get_serializer(c).data,
-            })
-
-        scored_candidates.sort(
+        sorted_candidates = sorted(
+            scored_candidates,
             key=lambda item: (item["priority"], item["score"]),
             reverse=True
         )
 
-        return Response(scored_candidates[:50])
+        return Response(sorted_candidates[:TOP_RESULTS])
+
+    def _get_candidates(self, user):
+        swiped_ids = Swipe.objects.filter(actor=user).values_list("target_id", flat=True)
+        queryset = CustomUser.objects.exclude(id__in=swiped_ids).exclude(id=user.id).exclude(role=CustomUser.Role.ADMIN)
+
+        if user.interested_in:
+            queryset = queryset.filter(gender__in=user.interested_in)
+
+        return list(queryset.filter(interested_in__contains=[user.gender])[:MAX_CANDIDATES])
+
+    def _filter_by_distance(self, user, candidates):
+        if user.latitude is None or user.longitude is None:
+            return candidates
+
+        max_dist = user.max_distance
+        return [
+            c for c in candidates
+            if c.latitude and c.longitude and
+               distance_km(user.latitude, user.longitude, c.latitude, c.longitude) <= max_dist
+        ]
+
+    def _score_candidates(self, user, candidates):
+        liked_me_ids = set(
+            Swipe.objects.filter(target=user, action=Swipe.Action.LIKE)
+            .values_list("actor_id", flat=True)
+        )
+
+        all_tags = (user.tags or []) + [tag for c in candidates for tag in (c.tags or [])]
+        vocab = sorted(set(all_tags))
+        user_vector = build_tag_vector(user.tags, vocab)
+
+        scored = []
+        for candidate in candidates:
+            score_data = self._calculate_single_score(user, user_vector, candidate, vocab)
+
+            is_liked_by_candidate = candidate.id in liked_me_ids
+            priority = 1 if (is_liked_by_candidate and score_data['final'] >= MATCH_THRESHOLD) else 0
+
+            scored.append({
+                "score": round(score_data['final'], 4),
+                "priority": priority,
+                "liked_me": is_liked_by_candidate,
+                "common": score_data['common'],
+                "cosine": round(score_data['cosine'], 4),
+                "emb": round(score_data['emb'], 4),
+                "user": self.get_serializer(candidate).data,
+            })
+        return scored
+
+    def _calculate_single_score(self, user, user_vector, candidate, vocab):
+        common_count = len(set(user.tags or []) & set(candidate.tags or []))
+        cosine_score = cosine(user_vector, build_tag_vector(candidate.tags, vocab))
+
+        emb_score = 0.0
+        if user.profile_embedding is not None and candidate.profile_embedding is not None:
+            emb_score = dot(user.profile_embedding, candidate.profile_embedding)
+
+        final_score = (
+                WEIGHT_TAGS * common_count +
+                WEIGHT_COSINE * cosine_score +
+                WEIGHT_EMBEDDING * emb_score
+        )
+
+        return {
+            "final": final_score,
+            "common": common_count,
+            "cosine": cosine_score,
+            "emb": emb_score
+        }
 
 class SwipeView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -162,36 +167,45 @@ class SwipeView(views.APIView):
 
         target_id = serializer.validated_data['target_id']
         action = serializer.validated_data['action']
-        target = get_object_or_404(CustomUser, id=target_id)
 
-        if request.user.id == target.id:
+        if request.user.id == target_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        swipe, created = Swipe.objects.get_or_create(
-            actor=request.user,
+        target = get_object_or_404(CustomUser, id=target_id)
+
+        self._record_swipe(request.user, target, action)
+        is_match = self._check_match(request.user, target, action)
+
+        return Response({"is_match": is_match}, status=status.HTTP_200_OK)
+
+    def _record_swipe(self, actor, target, action):
+        Swipe.objects.update_or_create(
+            actor=actor,
             target=target,
             defaults={'action': action}
         )
 
-        if not created:
-            swipe.action = action
-            swipe.save()
+    def _check_match(self, actor, target, action):
+        if action != Swipe.Action.LIKE:
+            return False
 
-        is_match = False
-        if action == Swipe.LIKE:
-            has_liked_back = Swipe.objects.filter(
-                actor=target,
-                target=request.user,
-                action=Swipe.LIKE
-            ).exists()
+        has_liked_back = Swipe.objects.filter(
+            actor=target, target=actor, action=Swipe.Action.LIKE
+        ).exists()
 
-            if has_liked_back:
-                if not Match.objects.filter(users=request.user).filter(users=target).exists():
-                    match = Match.objects.create()
-                    match.users.add(request.user, target)
-                    is_match = True
+        if has_liked_back:
+            # Poprawiona logika tworzenia matcha:
+            # 1. Sprawdzamy czy match już istnieje między tą parą
+            existing_match = Match.objects.filter(users=actor).filter(users=target).first()
 
-        return Response({"is_match": is_match}, status=status.HTTP_200_OK)
+            if not existing_match:
+                # 2. Jeśli nie, tworzymy nowy i dodajemy obu użytkowników
+                match = Match.objects.create()
+                match.users.add(actor, target)
+
+            return True
+
+        return False
 
 class MyMatchesView(generics.ListAPIView):
     serializer_class = MatchListSerializer
@@ -205,15 +219,13 @@ class MessageListView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        match_id = self.kwargs['match_id']
-        match = get_object_or_404(Match, id=match_id)
+        match = get_object_or_404(Match, id=self.kwargs['match_id'])
         if self.request.user not in match.users.all():
             return Message.objects.none()
         return Message.objects.filter(match=match)
 
     def perform_create(self, serializer):
-        match_id = self.kwargs['match_id']
-        match = get_object_or_404(Match, id=match_id)
+        match = get_object_or_404(Match, id=self.kwargs['match_id'])
         if self.request.user not in match.users.all():
             raise permissions.PermissionDenied()
         serializer.save(sender=self.request.user, match=match)
@@ -222,11 +234,30 @@ class GlobalChatStreamView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        def event_stream():
-            last_msg = Message.objects.order_by('-id').first()
-            last_id = last_msg.id if last_msg else 0
+        response = StreamingHttpResponse(
+            self._event_stream(request),
+            content_type='text/event-stream'
+        )
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
 
-            while True:
+    def _event_stream(self, request):
+        last_msg = Message.objects.order_by('-id').first()
+        last_id = last_msg.id if last_msg else 0
+        connection.ensure_connection()
+
+        with connection.cursor() as cursor:
+            cursor.execute(f"LISTEN {DB_NOTIFY_CHANNEL}")
+
+        while True:
+            if select.select([connection.connection], [], [], 15) == ([], [], []):
+                yield ": keep-alive\n\n"
+            else:
+                connection.connection.poll()
+                while connection.connection.notifies:
+                    connection.connection.notifies.pop(0)
+
                 new_messages = Message.objects.filter(
                     match__users=request.user,
                     id__gt=last_id
@@ -237,10 +268,3 @@ class GlobalChatStreamView(views.APIView):
                     data['match_id'] = msg.match.id
                     yield f"data: {json.dumps(data)}\n\n"
                     last_id = msg.id
-
-                time.sleep(1)
-                yield ": keep-alive\n\n"
-
-        response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
-        response['Cache-Control'] = 'no-cache'
-        return response

@@ -189,11 +189,11 @@ const RegisterPage: React.FC = () => {
                 username: formData.username,
                 email: formData.email,
                 password: formData.password,
-                first_name: formData.firstName,
-                last_name: formData.lastName,
+                firstName: formData.firstName,
+                lastName: formData.lastName,
                 age: Number(formData.age),
                 gender: formData.gender,
-                interested_in: formData.interestedIn,
+                interestedIn: formData.interestedIn,
                 latitude: coords.lat,
                 longitude: coords.lng,
                 tags: formData.tags
@@ -219,7 +219,7 @@ const RegisterPage: React.FC = () => {
                 setErrors(newErrors);
 
                 if (newErrors.email || newErrors.username || newErrors.password) setStep(1);
-                else if (newErrors.first_name || newErrors.last_name || newErrors.age) setStep(2);
+                else if (newErrors.firstName || newErrors.lastName || newErrors.age) setStep(2);
 
                 toaster.create({
                     title: "Registration failed",

@@ -1,10 +1,10 @@
 ﻿from rest_framework import serializers
-from .models import CustomUser, Match, Swipe, Message
-from django.contrib.auth import get_user_model
-from django.utils.timesince import timesince
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from django.db.models import Q
 from rest_framework.validators import UniqueValidator
+from django.contrib.auth import get_user_model
+from django.db.models import Q
+from django.utils.timesince import timesince
+from .models import CustomUser, Match, Swipe, Message
 
 User = get_user_model()
 
@@ -21,22 +21,16 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
             if user:
                 attrs[self.username_field] = user.get_username()
-        try:
-            return super().validate(attrs)
-        except Exception as e:
-            raise serializers.ValidationError("Invalid credentials")
+
+        return super().validate(attrs)
 
 class UserSerializer(serializers.ModelSerializer):
     firstName = serializers.CharField(source='first_name', required=False)
     lastName = serializers.CharField(source='last_name', required=False)
-    description = serializers.CharField(source='bio', allow_blank=True, required=False)
     profilePhoto = serializers.ImageField(source='profile_picture', required=False)
-    latitude = serializers.FloatField(required=False, allow_null=True)
-    longitude = serializers.FloatField(required=False, allow_null=True)
-    city = serializers.CharField(required=False, allow_blank=True, read_only=True)
-    country = serializers.CharField(required=False, allow_blank=True, read_only=True)
-    interestedIn = serializers.ListField(source='interested_in', child=serializers.CharField(), required=False)
-    location = serializers.SerializerMethodField()
+    description = serializers.CharField(source='bio', required=False, allow_blank=True)
+    interestedIn = serializers.JSONField(source='interested_in', required=False)
+    location = serializers.CharField(source='get_full_location', read_only=True)
 
     class Meta:
         model = CustomUser
@@ -45,155 +39,126 @@ class UserSerializer(serializers.ModelSerializer):
             'firstName', 'lastName',
             'role', 'profilePhoto', 'description',
             'age', 'gender', 'interestedIn',
-            'location',
-            'latitude', 'longitude', 'city', 'country',
-            'tags', 'occupation', 'university','max_distance',
+            'location', 'latitude', 'longitude',
+            'city', 'country', 'tags',
+            'occupation', 'university', 'max_distance',
         )
         read_only_fields = ('role', 'username', 'email')
-
-    def get_location(self, obj):
-        parts = [p for p in [obj.city, obj.country] if p]
-        return ", ".join(parts)
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(
         required=True,
-        validators=[UniqueValidator(queryset=CustomUser.objects.all(), message="This email is already in use.")]
+        validators=[UniqueValidator(queryset=CustomUser.objects.all(), message="Email already exists")]
     )
     username = serializers.CharField(
         required=True,
-        validators=[UniqueValidator(queryset=CustomUser.objects.all(), message="This username is already taken.")]
+        validators=[UniqueValidator(queryset=CustomUser.objects.all(), message="Username already taken")]
     )
     password = serializers.CharField(write_only=True)
-    first_name = serializers.CharField(required=True, allow_blank=False)
-    last_name = serializers.CharField(required=True, allow_blank=False)
-    age = serializers.IntegerField(required=True)
-    gender = serializers.CharField(required=True)
-    interested_in = serializers.ListField(child=serializers.CharField(), required=True)
-    latitude = serializers.FloatField(required=True)
-    longitude = serializers.FloatField(required=True)
-    tags = serializers.ListField(child=serializers.CharField(), required=False)
+    firstName = serializers.CharField(source='first_name', required=True)
+    lastName = serializers.CharField(source='last_name', required=True)
+    interestedIn = serializers.ListField(source='interested_in', child=serializers.CharField(), required=True)
+    tags = serializers.ListField(child=serializers.CharField(), required=False, default=list)
 
     class Meta:
         model = CustomUser
         fields = (
             "username", "email", "password",
-            "first_name", "last_name",
-            "age", "gender", "interested_in", "tags",
+            "firstName", "lastName",
+            "age", "gender", "interestedIn", "tags",
             "latitude", "longitude",
         )
 
     def validate_age(self, value):
-        if value < 18:
-            raise serializers.ValidationError("Must be 18+")
-        if value >= 100:
-            raise serializers.ValidationError("Must be less than 100")
+        if not (18 <= value < 100):
+            raise serializers.ValidationError("Age must be between 18 and 100")
         return value
 
     def create(self, validated_data):
         password = validated_data.pop("password")
-        tags = validated_data.pop("tags", [])
-        interested_in = validated_data.pop("interested_in", [])
-
         user = CustomUser(**validated_data)
         user.set_password(password)
-        user.tags = tags
-        user.interested_in = interested_in
         user.save()
         return user
 
 class DatingProfileSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(source='profile_picture', read_only=True)
     firstName = serializers.CharField(source='first_name', read_only=True)
-    lastName  = serializers.CharField(source='last_name', read_only=True)
-    name = serializers.SerializerMethodField()
+    lastName = serializers.CharField(source='last_name', read_only=True)
     description = serializers.CharField(source='bio', read_only=True)
-    location = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+    location = serializers.CharField(source='get_full_location', read_only=True)
 
     class Meta:
         model = User
         fields = (
-            'id',
-            'image',
-            'firstName', 'lastName', 'name',
-            'age', 'gender',
-            'location',
+            'id', 'image', 'name',
+            'firstName', 'lastName',
+            'age', 'gender', 'location',
             'occupation', 'university',
-            'description',
-            'tags',
+            'description', 'tags',
         )
-    def get_name(self, obj):
-        return obj.first_name if obj.first_name else obj.username
 
-    def get_location(self, obj):
-        parts = [p for p in [obj.city, obj.country] if p]
-        return ", ".join(parts)
+    def get_name(self, obj):
+        return obj.first_name or obj.username
 
 class SwipeActionSerializer(serializers.Serializer):
     target_id = serializers.IntegerField()
-    action = serializers.ChoiceField(choices=['LIKE', 'PASS'])
+    action = serializers.ChoiceField(choices=Swipe.Action.choices)
 
 class MessageSerializer(serializers.ModelSerializer):
-    user = serializers.CharField(source='sender.first_name', read_only=True)
+    user_name = serializers.CharField(source='sender.first_name', read_only=True)
     content = serializers.CharField(source='text')
     time = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
-        fields = ('id', 'user', 'content', 'time', 'type')
+        fields = ('id', 'user_name', 'content', 'time', 'type')
 
     def get_time(self, obj):
         return obj.timestamp.strftime('%H:%M')
 
     def get_type(self, obj):
         request = self.context.get('request')
-        if request and obj.sender == request.user:
-            return 'outgoing'
-        return 'incoming'
+        is_sender = request and obj.sender == request.user
+        return 'outgoing' if is_sender else 'incoming'
 
 class MatchListSerializer(serializers.ModelSerializer):
+    match_id = serializers.IntegerField(source='id')
     name = serializers.SerializerMethodField()
     subtitle = serializers.SerializerMethodField()
     time = serializers.SerializerMethodField()
     message = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
-    match_id = serializers.IntegerField(source='id')
 
     class Meta:
         model = Match
         fields = ('match_id', 'name', 'subtitle', 'time', 'message', 'avatar')
 
-    def get_partner(self, obj):
-        user = self.context['request'].user
-        return obj.users.exclude(id=user.id).first()
-
     def get_name(self, obj):
-        partner = self.get_partner(obj)
-        return partner.first_name if partner and partner.first_name else partner.username if partner else "Unknown"
+        partner = obj.get_partner(self.context['request'].user)
+        if not partner:
+            return "Unknown"
+        return partner.first_name or partner.username
 
     def get_subtitle(self, obj):
-        partner = self.get_partner(obj)
+        partner = obj.get_partner(self.context['request'].user)
         return partner.occupation if partner else ""
 
     def get_avatar(self, obj):
-        partner = self.get_partner(obj)
-        if partner and partner.profile_picture:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(partner.profile_picture.url)
-            return partner.profile_picture.url
-        return None
+        partner = obj.get_partner(self.context['request'].user)
+        if not partner or not partner.profile_picture:
+            return None
 
-    def get_last_message(self, obj):
-        return obj.messages.last()
+        request = self.context.get('request')
+        url = partner.profile_picture.url
+        return request.build_absolute_uri(url) if request else url
 
     def get_time(self, obj):
-        msg = self.get_last_message(obj)
-        if msg:
-            return timesince(msg.timestamp).split(',')[0] + " ago"
-        return ""
+        msg = obj.messages.last()
+        return f"{timesince(msg.timestamp).split(',')[0]} ago" if msg else ""
 
     def get_message(self, obj):
-        msg = self.get_last_message(obj)
+        msg = obj.messages.last()
         return msg.text if msg else "New Match!"

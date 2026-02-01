@@ -1,14 +1,18 @@
-export interface FeedUser {
-    id: number;
-    image: string;
+interface BaseUser {
     firstName: string;
     lastName: string;
     age: number;
     location: string;
-    occupation: string;
-    university: string;
     description: string;
     tags: string[];
+}
+
+
+export interface FeedUser extends BaseUser {
+    id: number;
+    image: string;
+    occupation: string;
+    university: string;
 }
 
 export interface FeedItem {
@@ -17,3 +21,22 @@ export interface FeedItem {
     score: number;
     user: FeedUser;
 }
+
+
+export interface ProfileData extends BaseUser {
+    gender: 'M' | 'F' | 'O';
+    interestedIn: string[];
+    max_distance: number;
+    profilePhoto: string;
+}
+
+
+export interface ValidationErrors {
+    firstName?: string;
+    lastName?: string;
+    age?: string;
+    description?: string;
+    max_distance?: string;
+}
+
+

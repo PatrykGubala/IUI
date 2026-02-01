@@ -26,6 +26,8 @@ const VALIDATION_RULES = {
     NAME_REGEX: /^[a-zA-Z\s-]+$/,
     MAX_DESCRIPTION_LENGTH: 500,
     MIN_AGE: 18,
+    MIN_AGE_DIFF: 0,
+    MAX_AGE_DIFF: 50,
     MIN_DISTANCE: 1,
 } as const;
 
@@ -51,6 +53,7 @@ const INITIAL_PROFILE_DATA: ProfileData = {
     interestedIn: [],
     location: "",
     max_distance: 50,
+    max_age_diff: 5,
     description: "",
     profilePhoto: DEFAULT_PHOTO_URL,
     tags: []
@@ -122,6 +125,11 @@ const ProfilePage: React.FC = () => {
             newErrors.max_distance = "Max distance must be greater than 1 km!";
         }
 
+        if (profileData.max_age_diff < VALIDATION_RULES.MIN_AGE_DIFF ||
+            profileData.max_age_diff > VALIDATION_RULES.MAX_AGE_DIFF) {
+            newErrors.max_age_diff = `Max age difference must be between ${VALIDATION_RULES.MIN_AGE_DIFF} and ${VALIDATION_RULES.MAX_AGE_DIFF} years`;
+        }
+
         return newErrors;
     };
 
@@ -140,7 +148,7 @@ const ProfilePage: React.FC = () => {
         try {
             const response = await api.get(USER_PROFILE_URL);
             setProfileData(response.data);
-        } catch (error) {
+        } catch {
             showToast("Failed to load profile", "error");
         }
     };
@@ -160,7 +168,7 @@ const ProfilePage: React.FC = () => {
             }));
 
             showToast("Profile photo updated", "success");
-        } catch (error) {
+        } catch {
             showToast("Failed to upload photo", "error");
         }
     };
@@ -176,7 +184,7 @@ const ProfilePage: React.FC = () => {
 
             setProfileData(response.data);
             showToast("Location saved successfully","success");
-        } catch (error) {
+        } catch {
             showToast("Failed to save location", "error");
         }
     };
@@ -198,11 +206,12 @@ const ProfilePage: React.FC = () => {
                 gender: profileData.gender,
                 interestedIn: profileData.interestedIn,
                 max_distance: profileData.max_distance,
+                max_age_diff: profileData.max_age_diff,
                 tags: profileData.tags
             });
 
             showToast("Profile saved successfully","success");
-        } catch (error) {
+        } catch {
             showToast("Failed to save profile", "error")
         }
     };
@@ -332,7 +341,7 @@ const ProfilePage: React.FC = () => {
                             <NativeSelect.Root>
                                 <NativeSelect.Field
                                     value={profileData.gender}
-                                    onChange={(e) => updateProfileField('gender', e.target.value)}
+                                    onChange={(e) => updateProfileField('gender', e.target.value as ProfileData['gender'])}
                                 >
                                     {Object.entries(GENDER_OPTIONS).map(([value, label]) => (
                                         <option key={value} value={value}>{label}</option>
@@ -417,6 +426,13 @@ const ProfilePage: React.FC = () => {
                         label="Max distance (km)"
                         value={profileData.max_distance?.toString()}
                         onChange={(value) => updateProfileField('max_distance', parseInt(value))}
+                        type="number"
+                    />
+
+                    <EditableField
+                        label="Max age difference"
+                        value={profileData.max_age_diff?.toString()}
+                        onChange={(value) => updateProfileField('max_age_diff', parseInt(value))}
                         type="number"
                     />
 

@@ -27,6 +27,7 @@ export interface ProfileData extends BaseUser {
     gender: 'M' | 'F' | 'O';
     interestedIn: string[];
     max_distance: number;
+    max_age_diff: number;
     profilePhoto: string;
 }
 
@@ -37,6 +38,7 @@ export interface ValidationErrors {
     age?: string;
     description?: string;
     max_distance?: string;
+    max_age_diff?: string;
 }
 
 

@@ -83,9 +83,16 @@ class PotentialMatchesView(generics.ListAPIView):
         return qs
 
     def list(self, request, *args, **kwargs):
+
         me = request.user
         me_emb = me.profile_embedding
-        max_km = 20
+        max_km = me.max_distance or 20
+
+        liked_me_ids = set(
+            Swipe.objects
+            .filter(target=me, action=Swipe.LIKE)
+            .values_list("actor_id", flat=True)
+        )
 
         candidates = list(self.get_queryset()[:5000])
 
@@ -124,15 +131,24 @@ class PotentialMatchesView(generics.ListAPIView):
                     0.5 * emb_score
             )
 
+            liked_me = c.id in liked_me_ids
+            priority = 1 if (liked_me and final_score >= 0.6) else 0
+
             scored_candidates.append({
                 "score": round(final_score, 4),
+                "priority": priority,
+                "liked_me": liked_me,
                 "common": common_tags_count,
                 "cosine": round(cosine_score, 4),
                 "emb": round(emb_score, 4),
                 "user": self.get_serializer(c).data,
             })
 
-        scored_candidates.sort(key=lambda item: item["score"], reverse=True)
+        scored_candidates.sort(
+            key=lambda item: (item["priority"], item["score"]),
+            reverse=True
+        )
+
         return Response(scored_candidates[:50])
 
 class SwipeView(views.APIView):

@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.conf import settings
 from pgvector.django import VectorField
@@ -31,6 +32,10 @@ class CustomUser(AbstractUser):
     city = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True)
     profile_embedding = VectorField(dimensions=768, null=True, blank=True)
+    max_distance= models.IntegerField(
+        default=20,
+        validators=[MinValueValidator(1), MaxValueValidator(300)],
+    )
 
 
     def __str__(self):

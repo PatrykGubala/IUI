@@ -211,12 +211,9 @@ class SwipeView(views.APIView):
         ).exists()
 
         if has_liked_back:
-            # Poprawiona logika tworzenia matcha:
-            # 1. Sprawdzamy czy match już istnieje między tą parą
             existing_match = Match.objects.filter(users=actor).filter(users=target).first()
 
             if not existing_match:
-                # 2. Jeśli nie, tworzymy nowy i dodajemy obu użytkowników
                 match = Match.objects.create()
                 match.users.add(actor, target)
 

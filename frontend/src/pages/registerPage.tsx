@@ -35,7 +35,7 @@ const EyeOffIcon = () => (
     </svg>
 );
 
-const TAG_GROUPS = {
+export const TAG_GROUPS = {
     "Sports": ["Football", "Yoga", "Gym", "Running", "Tennis"],
     "Tech": ["Coding", "Gaming", "AI", "Crypto", "Gadgets"],
     "Art": ["Painting", "Music", "Photography", "Design", "Writing"],
